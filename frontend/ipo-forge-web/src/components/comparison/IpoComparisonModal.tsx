@@ -16,9 +16,8 @@ import {
   Check,
   Trophy,
   Sparkles,
-  Calendar,
-  Layers,
   ArrowRight,
+  Filter,
 } from 'lucide-react';
 import { ScoreRing } from '../common/ScoreRing';
 import { GmpBadge } from '../common/GmpBadge';
@@ -42,13 +41,14 @@ export const IpoComparisonModal: React.FC<IpoComparisonModalProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [downloadingImage, setDownloadingImage] = useState(false);
+  const [shareActiveOnly, setShareActiveOnly] = useState(true);
 
   if (!isOpen || ipos.length === 0) return null;
 
   const decision = evaluateComparison(ipos);
 
   const handleCopyText = async () => {
-    const text = generateWhatsAppShareText(ipos);
+    const text = generateWhatsAppShareText(ipos, shareActiveOnly);
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -95,14 +95,28 @@ export const IpoComparisonModal: React.FC<IpoComparisonModalProps> = ({
               </h2>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Deterministic 19-pillar evaluation comparing live GMP, fundamentals, valuations, and listing margin of safety.
+              Evaluates live open & upcoming IPOs for listing gains, fundamentals, and subscription velocity.
             </p>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* WhatsApp Share Filter Toggle */}
+            <button
+              onClick={() => setShareActiveOnly(!shareActiveOnly)}
+              className={`px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition flex items-center space-x-1.5 ${
+                shareActiveOnly
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                  : 'bg-slate-800 border-slate-700 text-slate-400'
+              }`}
+              title="Toggle to share only Active & Upcoming IPOs"
+            >
+              <Filter className="w-3 h-3" />
+              <span>{shareActiveOnly ? 'Active / Open Only' : 'Share All Selected'}</span>
+            </button>
+
             {/* WhatsApp Share */}
             <button
-              onClick={() => shareToWhatsApp(ipos)}
+              onClick={() => shareToWhatsApp(ipos, shareActiveOnly)}
               className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/50 transition flex items-center space-x-1.5"
               title="Share comparison directly to WhatsApp"
             >
@@ -153,7 +167,7 @@ export const IpoComparisonModal: React.FC<IpoComparisonModalProps> = ({
         {/* Modal Scrollable Body */}
         <div className="p-6 overflow-y-auto space-y-6">
           {/* Winner AI Decision Banner */}
-          {decision.winnerName && (
+          {decision.hasActiveCandidates ? (
             <div className="bg-gradient-to-r from-emerald-950/60 via-slate-900 to-navy-950/60 border border-emerald-500/40 rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-start space-x-3.5">
                 <div className="p-3 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
@@ -184,13 +198,18 @@ export const IpoComparisonModal: React.FC<IpoComparisonModalProps> = ({
                 </Link>
               </div>
             </div>
+          ) : (
+            <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-xs text-slate-400 text-center">
+              ℹ️ All selected IPOs in this view are closed or already listed. To find the best active opportunity, select an upcoming or open IPO below!
+            </div>
           )}
 
           {/* Side-by-Side Comparison Grid */}
           <div className={`grid grid-cols-1 md:grid-cols-${Math.min(ipos.length, 4)} gap-4`}>
             {decision.rankings.map((ranked) => {
               const ipo = ranked.ipo;
-              const isWinner = ranked.rank === 1;
+              const isWinner = ranked.rank === 1 && ranked.isApplyable;
+              const isClosedOrListed = ipo.status === 'Closed' || ipo.status === 'AllotmentOut' || ipo.status === 'Listed';
 
               return (
                 <div
@@ -202,7 +221,7 @@ export const IpoComparisonModal: React.FC<IpoComparisonModalProps> = ({
                   }`}
                 >
                   <div>
-                    {/* Rank Badge */}
+                    {/* Rank Badge & Status */}
                     <div className="flex items-center justify-between mb-3">
                       <span
                         className="px-2.5 py-1 rounded-lg text-xs font-bold font-mono"
@@ -280,15 +299,15 @@ export const IpoComparisonModal: React.FC<IpoComparisonModalProps> = ({
                         </span>
                       </div>
                       <div className="flex justify-between py-1">
-                        <span className="text-slate-400">Bidding Dates</span>
+                        <span className="text-slate-400">Bidding Window</span>
                         <span className="font-mono text-slate-300">
                           {formatDate(ipo.openDate)} – {formatDate(ipo.closeDate)}
                         </span>
                       </div>
                       <div className="flex justify-between py-1">
-                        <span className="text-slate-400">Listing Date</span>
-                        <span className="font-mono text-slate-300">
-                          {formatDate(ipo.listingDate)}
+                        <span className="text-slate-400">{isClosedOrListed ? 'Listing / Listed Date' : 'Expected Listing'}</span>
+                        <span className="font-mono font-semibold text-slate-200">
+                          {formatDate(ipo.listingDate || ipo.closeDate)}
                         </span>
                       </div>
                     </div>

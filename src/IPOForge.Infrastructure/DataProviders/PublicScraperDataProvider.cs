@@ -126,26 +126,61 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
                 else if (rawStatus.Contains("Listed", StringComparison.OrdinalIgnoreCase)) status = IpoStatus.Listed;
                 else if (rawStatus.Contains("Allot", StringComparison.OrdinalIgnoreCase)) status = IpoStatus.Allotted;
 
-                // Parse Dates e.g. "10-15 Sept", "1-3 Sept", "21-23 Sept"
+                // Robust Multi-format & Cross-Month Date Parsing (e.g. "31-2 Sept", "28-1 Sept", "10-15 Sept", "21-23 Sept")
                 DateTime? openDate = null;
                 DateTime? closeDate = null;
-                var dateMatch = Regex.Match(rawDate, @"(\d+)\s*-\s*(\d+)\s*([A-Za-z]+)");
-                if (dateMatch.Success)
-                {
-                    int dStart = int.Parse(dateMatch.Groups[1].Value);
-                    int dEnd = int.Parse(dateMatch.Groups[2].Value);
-                    string mStr = dateMatch.Groups[3].Value;
 
-                    if (MonthLookup.TryGetValue(mStr, out int mNum))
+                // Pattern 1: "28 Aug - 1 Sept"
+                var matchTwoMonth = Regex.Match(rawDate, @"(\d+)\s*([A-Za-z]+)\s*-\s*(\d+)\s*([A-Za-z]+)");
+                if (matchTwoMonth.Success)
+                {
+                    int d1 = int.Parse(matchTwoMonth.Groups[1].Value);
+                    string m1Str = matchTwoMonth.Groups[2].Value;
+                    int d2 = int.Parse(matchTwoMonth.Groups[3].Value);
+                    string m2Str = matchTwoMonth.Groups[4].Value;
+
+                    if (MonthLookup.TryGetValue(m1Str, out int m1) && MonthLookup.TryGetValue(m2Str, out int m2))
                     {
                         try
                         {
-                            openDate = new DateTime(currentYear, mNum, Math.Min(dStart, 28), 10, 0, 0, DateTimeKind.Utc);
-                            closeDate = new DateTime(currentYear, mNum, Math.Min(dEnd, 28), 17, 0, 0, DateTimeKind.Utc);
+                            openDate = new DateTime(currentYear, m1, Math.Min(d1, DateTime.DaysInMonth(currentYear, m1)), 10, 0, 0, DateTimeKind.Utc);
+                            closeDate = new DateTime(currentYear, m2, Math.Min(d2, DateTime.DaysInMonth(currentYear, m2)), 17, 0, 0, DateTimeKind.Utc);
                         }
-                        catch
+                        catch { }
+                    }
+                }
+
+                // Pattern 2: "31-2 Sept" or "10-15 Sept"
+                if (openDate == null)
+                {
+                    var matchSingleMonth = Regex.Match(rawDate, @"(\d+)\s*-\s*(\d+)\s*([A-Za-z]+)");
+                    if (matchSingleMonth.Success)
+                    {
+                        int dStart = int.Parse(matchSingleMonth.Groups[1].Value);
+                        int dEnd = int.Parse(matchSingleMonth.Groups[2].Value);
+                        string mStr = matchSingleMonth.Groups[3].Value;
+
+                        if (MonthLookup.TryGetValue(mStr, out int mEnd))
                         {
-                            // fallback
+                            int mStart = mEnd;
+                            int yStart = currentYear;
+
+                            // Cross-month edge case (e.g. 31 Aug - 2 Sept, 28 Aug - 1 Sept)
+                            if (dStart > dEnd)
+                            {
+                                mStart = mEnd > 1 ? mEnd - 1 : 12;
+                                yStart = mEnd > 1 ? currentYear : currentYear - 1;
+                            }
+
+                            try
+                            {
+                                int safeStartDay = Math.Min(dStart, DateTime.DaysInMonth(yStart, mStart));
+                                int safeEndDay = Math.Min(dEnd, DateTime.DaysInMonth(currentYear, mEnd));
+
+                                openDate = new DateTime(yStart, mStart, safeStartDay, 10, 0, 0, DateTimeKind.Utc);
+                                closeDate = new DateTime(currentYear, mEnd, safeEndDay, 17, 0, 0, DateTimeKind.Utc);
+                            }
+                            catch { }
                         }
                     }
                 }

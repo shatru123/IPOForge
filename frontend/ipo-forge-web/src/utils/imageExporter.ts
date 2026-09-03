@@ -4,13 +4,15 @@ export interface ComparisonDecision {
   winnerId: string;
   winnerName: string;
   reason: string;
+  hasActiveCandidates: boolean;
   rankings: {
     ipo: IpoSummary;
     rank: number;
     badge: string;
     verdict: string;
-    applyAdvice: 'Strong Apply' | 'Apply for Listing Gains' | 'Long-Term Only' | 'Neutral' | 'Avoid';
+    applyAdvice: 'Strong Apply' | 'Apply for Listing Gains' | 'Long-Term Only' | 'Neutral' | 'Avoid' | 'Closed' | 'Listed';
     color: string;
+    isApplyable: boolean;
   }[];
 }
 
@@ -20,50 +22,73 @@ export function evaluateComparison(ipos: IpoSummary[]): ComparisonDecision {
       winnerId: '',
       winnerName: 'N/A',
       reason: 'No IPOs selected',
+      hasActiveCandidates: false,
       rankings: []
     };
   }
 
-  // Calculate composite decision metric: 60% Listing Gain Score + 40% Long-Term Score + GMP bonus
-  const scored = ipos.map((ipo) => {
+  // Calculate composite decision metric
+  const evaluated = ipos.map((ipo) => {
     const listScore = ipo.listingGainScore ?? 50;
     const ltScore = ipo.longTermScore ?? 50;
     const gmpPct = ipo.latestGmpPercentage ?? 0;
-    
-    // Composite weighted rating
-    let composite = listScore * 0.55 + ltScore * 0.35 + Math.min(30, gmpPct * 0.4);
-    if (ipo.status === 'Open') composite += 5; // Preference for actively taking applications
+    const isOpen = ipo.status === 'Open';
+    const isUpcoming = ipo.status === 'Upcoming';
+    const isClosed = ipo.status === 'Closed' || ipo.status === 'AllotmentOut';
+    const isListed = ipo.status === 'Listed';
 
-    let applyAdvice: 'Strong Apply' | 'Apply for Listing Gains' | 'Long-Term Only' | 'Neutral' | 'Avoid';
+    const isApplyable = isOpen || isUpcoming;
+
+    let applyAdvice: 'Strong Apply' | 'Apply for Listing Gains' | 'Long-Term Only' | 'Neutral' | 'Avoid' | 'Closed' | 'Listed';
     let badge = 'Neutral';
     let color = '#94A3B8';
     let verdict = '';
+    let composite = 0;
 
-    if (listScore >= 75 && gmpPct >= 20) {
-      applyAdvice = 'Strong Apply';
-      badge = '🟢 Strong Apply';
-      color = '#10B981';
-      verdict = `High Listing Gain expected (+${gmpPct.toFixed(1)}% GMP) with strong institutional backing.`;
-    } else if (listScore >= 65 || gmpPct >= 10) {
-      applyAdvice = 'Apply for Listing Gains';
-      badge = '🟢 Listing Gain Play';
-      color = '#34D399';
-      verdict = `Favorable listing upside (+${gmpPct.toFixed(1)}% GMP) for short-term allotment gains.`;
-    } else if (ltScore >= 75 && listScore < 60) {
-      applyAdvice = 'Long-Term Only';
-      badge = '🔵 Long-Term Fundamental';
-      color = '#60A5FA';
-      verdict = `High business quality & ROE, but listing day premium is currently subdued.`;
-    } else if (listScore >= 48) {
-      applyAdvice = 'Neutral';
-      badge = '🟡 Moderate / Neutral';
-      color = '#FBBF24';
-      verdict = `Moderate risk-reward. Monitor day-2 QIB subscription velocity before bidding.`;
-    } else {
-      applyAdvice = 'Avoid';
-      badge = '🔴 Avoid / High Risk';
+    if (isListed) {
+      applyAdvice = 'Listed';
+      badge = '⚪ Already Listed';
+      color = '#64748B';
+      const listGain = ipo.actualListingGainPercent ?? ipo.listingGainPercent ?? gmpPct;
+      verdict = `Listed on ${formatShortDate(ipo.listingDate || ipo.closeDate)} (Listing Day Return: +${listGain}%). Trading in secondary market.`;
+      composite = -100; // Not candidate for "Best to Apply"
+    } else if (isClosed) {
+      applyAdvice = 'Closed';
+      badge = '🔴 Bidding Closed';
       color = '#F87171';
-      verdict = `Weak grey market demand or rich valuation multiples. Low margin of safety.`;
+      verdict = `Bidding closed on ${formatShortDate(ipo.closeDate)}. Expected listing on ${formatShortDate(ipo.listingDate)}. Check allotment status on registrar.`;
+      composite = -50; // Not candidate for "Best to Apply"
+    } else {
+      // Active / Upcoming candidates
+      composite = listScore * 0.55 + ltScore * 0.35 + Math.min(30, gmpPct * 0.4);
+      if (isOpen) composite += 8; // Bonus for actively taking applications today
+
+      if (listScore >= 75 && gmpPct >= 20) {
+        applyAdvice = 'Strong Apply';
+        badge = isOpen ? '🟢 Open: Strong Apply' : '🔵 Upcoming: Strong Pre-Apply';
+        color = '#10B981';
+        verdict = `High Listing Gain expected (+${gmpPct.toFixed(1)}% GMP) with strong institutional backing.`;
+      } else if (listScore >= 65 || gmpPct >= 10) {
+        applyAdvice = 'Apply for Listing Gains';
+        badge = isOpen ? '🟢 Open: Listing Gain Play' : '🔵 Upcoming: Listing Gain Play';
+        color = '#34D399';
+        verdict = `Favorable listing upside (+${gmpPct.toFixed(1)}% GMP) for short-term allotment gains.`;
+      } else if (ltScore >= 75 && listScore < 60) {
+        applyAdvice = 'Long-Term Only';
+        badge = '🔵 Long-Term Fundamental';
+        color = '#60A5FA';
+        verdict = `High business quality & ROE, but listing day premium is currently subdued.`;
+      } else if (listScore >= 48) {
+        applyAdvice = 'Neutral';
+        badge = '🟡 Moderate / Neutral';
+        color = '#FBBF24';
+        verdict = `Moderate risk-reward. Monitor day-2 QIB subscription velocity before bidding.`;
+      } else {
+        applyAdvice = 'Avoid';
+        badge = '🔴 Avoid / High Risk';
+        color = '#F87171';
+        verdict = `Weak grey market demand or rich valuation multiples. Low margin of safety.`;
+      }
     }
 
     return {
@@ -72,27 +97,35 @@ export function evaluateComparison(ipos: IpoSummary[]): ComparisonDecision {
       badge,
       verdict,
       applyAdvice,
-      color
+      color,
+      isApplyable
     };
   });
 
-  scored.sort((a, b) => b.composite - a.composite);
+  // Sort applyable candidates first by composite score, then closed/listed
+  evaluated.sort((a, b) => b.composite - a.composite);
 
-  const rankings = scored.map((item, index) => ({
+  const rankings = evaluated.map((item, index) => ({
     ipo: item.ipo,
     rank: index + 1,
-    badge: index === 0 ? `🏆 Top Pick (${item.badge})` : item.badge,
+    badge: index === 0 && item.isApplyable ? `🏆 Top Pick (${item.badge})` : item.badge,
     verdict: item.verdict,
     applyAdvice: item.applyAdvice,
-    color: item.color
+    color: item.color,
+    isApplyable: item.isApplyable
   }));
 
-  const winner = rankings[0];
+  const applyableWinners = rankings.filter((r) => r.isApplyable);
+  const hasActiveCandidates = applyableWinners.length > 0;
+  const winner = hasActiveCandidates ? applyableWinners[0] : rankings[0];
 
   return {
-    winnerId: winner.ipo.id,
-    winnerName: winner.ipo.name,
-    reason: `${winner.ipo.name} leads with highest Listing Gain score (${winner.ipo.listingGainScore}/100) and +${(winner.ipo.latestGmpPercentage || 0).toFixed(1)}% live GMP.`,
+    winnerId: hasActiveCandidates ? winner.ipo.id : '',
+    winnerName: hasActiveCandidates ? winner.ipo.name : 'No Active IPO Open to Apply',
+    reason: hasActiveCandidates
+      ? `${winner.ipo.name} is currently ${winner.ipo.status.toUpperCase()} with highest Listing Gain score (${winner.ipo.listingGainScore}/100) and +${(winner.ipo.latestGmpPercentage || 0).toFixed(1)}% live GMP.`
+      : 'All selected IPOs have ended bidding or are already listed. Select open or upcoming IPOs to evaluate.',
+    hasActiveCandidates,
     rankings
   };
 }
@@ -102,7 +135,7 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
   const count = ipos.length;
 
   const width = Math.max(1000, count * 340 + 80);
-  const height = 780;
+  const height = 800;
 
   const canvas = document.createElement('canvas');
   const dpr = 2; // High-DPI Retina
@@ -143,7 +176,7 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
   ctx.fillText('IPO Comparison: Which is Better to Apply?', 40, 80);
 
   // Winner Callout Box
-  if (decision.rankings.length > 0) {
+  if (decision.hasActiveCandidates) {
     const boxX = width - 420;
     const boxY = 32;
     const boxW = 380;
@@ -180,13 +213,13 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
   decision.rankings.forEach((ranked, idx) => {
     const ipo = ranked.ipo;
     const cardX = 40 + idx * (cardWidth + 20);
-    const cardH = 540;
+    const cardH = 560;
 
-    const isWinner = ranked.rank === 1;
+    const isWinner = ranked.rank === 1 && ranked.isApplyable;
 
     // Card background
     ctx.fillStyle = isWinner ? 'rgba(15, 23, 42, 0.95)' : 'rgba(15, 23, 42, 0.75)';
-    ctx.strokeStyle = isWinner ? '#10B981' : '#334155';
+    ctx.strokeStyle = isWinner ? '#10B981' : ranked.isApplyable ? '#334155' : '#475569';
     ctx.lineWidth = isWinner ? 2 : 1;
     roundRect(ctx, cardX, startY, cardWidth, cardH, 14);
     ctx.fill();
@@ -203,7 +236,7 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
     const truncatedName = ipo.name.length > 24 ? ipo.name.slice(0, 22) + '...' : ipo.name;
     ctx.fillText(truncatedName, cardX + 16, startY + 54);
 
-    // Sector & Type
+    // Sector & Lifecycle Status
     ctx.fillStyle = '#94A3B8';
     ctx.font = '11px sans-serif';
     ctx.fillText(`${ipo.sector || 'Mainboard'} • ${ipo.status}`, cardX + 16, startY + 74);
@@ -232,6 +265,8 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
 
     // Metrics Table
     const metricsStartY = scoreBoxY + 80;
+    const isClosedOrListed = ipo.status === 'Closed' || ipo.status === 'AllotmentOut' || ipo.status === 'Listed';
+
     const metrics = [
       { label: 'Live GMP', val: `+₹${ipo.latestGmp || 0} (+${(ipo.latestGmpPercentage || 0).toFixed(1)}%)`, valColor: '#10B981' },
       { label: 'Est. Listing Price', val: `₹${ipo.estimatedListingPrice || ipo.priceBandHigh || '-'}`, valColor: '#FFFFFF' },
@@ -239,12 +274,12 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
       { label: 'Lot Size / Min Inv', val: `${ipo.lotSize || '-'} shs (₹${(ipo.minimumInvestment || 0).toLocaleString('en-IN')})`, valColor: '#E2E8F0' },
       { label: 'Issue Size', val: `₹${ipo.issueSize ? ipo.issueSize.toLocaleString('en-IN') + ' Cr' : 'TBD'}`, valColor: '#E2E8F0' },
       { label: 'Subscription', val: ipo.status === 'Upcoming' ? 'Bidding Soon' : `${ipo.totalSubscription || '-'}x`, valColor: '#34D399' },
-      { label: 'Bidding Window', val: `${formatShortDate(ipo.openDate)} – ${formatShortDate(ipo.closeDate)}`, valColor: '#CBD5E1' },
-      { label: 'Listing Date', val: formatShortDate(ipo.listingDate), valColor: '#CBD5E1' }
+      { label: 'Bidding Dates', val: `${formatShortDate(ipo.openDate)} – ${formatShortDate(ipo.closeDate)}`, valColor: '#CBD5E1' },
+      { label: isClosedOrListed ? 'Listing / Listed On' : 'Expected Listing', val: formatShortDate(ipo.listingDate || ipo.closeDate), valColor: '#CBD5E1' }
     ];
 
     metrics.forEach((m, mIdx) => {
-      const rowY = metricsStartY + mIdx * 32;
+      const rowY = metricsStartY + mIdx * 30;
       ctx.fillStyle = '#94A3B8';
       ctx.font = '11px sans-serif';
       ctx.fillText(m.label, cardX + 16, rowY);
@@ -254,20 +289,19 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
       const textWidth = ctx.measureText(m.val).width;
       ctx.fillText(m.val, cardX + cardWidth - 16 - textWidth, rowY);
 
-      // Light row divider
       if (mIdx < metrics.length - 1) {
         ctx.strokeStyle = 'rgba(51, 65, 85, 0.4)';
         ctx.beginPath();
-        ctx.moveTo(cardX + 16, rowY + 8);
-        ctx.lineTo(cardX + cardWidth - 16, rowY + 8);
+        ctx.moveTo(cardX + 16, rowY + 6);
+        ctx.lineTo(cardX + cardWidth - 16, rowY + 6);
         ctx.stroke();
       }
     });
 
     // Verdict Footer Box inside Card
-    const verdictY = startY + cardH - 64;
+    const verdictY = startY + cardH - 68;
     ctx.fillStyle = isWinner ? 'rgba(16, 185, 129, 0.15)' : 'rgba(30, 41, 59, 0.6)';
-    roundRect(ctx, cardX + 12, verdictY, cardWidth - 24, 52, 6);
+    roundRect(ctx, cardX + 12, verdictY, cardWidth - 24, 56, 6);
     ctx.fill();
 
     ctx.fillStyle = isWinner ? '#34D399' : '#E2E8F0';
@@ -290,20 +324,24 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
   return canvas.toDataURL('image/png');
 }
 
-export function generateWhatsAppShareText(ipos: IpoSummary[]): string {
-  const decision = evaluateComparison(ipos);
+export function generateWhatsAppShareText(ipos: IpoSummary[], activeOnly: boolean = false): string {
+  const targetIpos = activeOnly
+    ? ipos.filter((i) => i.status === 'Open' || i.status === 'Upcoming')
+    : ipos;
+
+  const decision = evaluateComparison(targetIpos.length > 0 ? targetIpos : ipos);
   const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  let text = `🚀 *IPOForge Intelligence — IPO Comparison & Which to Apply* 📊\n`;
+  let text = `🚀 *IPOForge Intelligence — Real-Time Indian IPO Comparison* 📊\n`;
   text += `📅 *Date:* ${dateStr}\n\n`;
 
-  if (decision.rankings.length > 0) {
-    text += `🏆 *#1 BEST PICK TO APPLY: ${decision.winnerName}*\n`;
-    text += `💡 *Reason:* ${decision.reason}\n\n`;
+  if (decision.hasActiveCandidates) {
+    text += `🏆 *#1 TOP PICK TO APPLY: ${decision.winnerName}*\n`;
+    text += `💡 *Verdict:* ${decision.reason}\n\n`;
   }
 
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `*DETAILED COMPARISON:*\n\n`;
+  text += `*IPO BREAKDOWN & DATES:*\n\n`;
 
   decision.rankings.forEach((r) => {
     const ipo = r.ipo;
@@ -314,26 +352,36 @@ export function generateWhatsAppShareText(ipos: IpoSummary[]): string {
     const dates = `${formatShortDate(ipo.openDate)} to ${formatShortDate(ipo.closeDate)}`;
     const sub = ipo.status === 'Upcoming' ? 'Bidding Soon' : `${ipo.totalSubscription || '-'}x`;
 
-    text += `📌 *${r.rank}. ${ipo.name}* [${r.badge}]\n`;
-    text += `• *Status:* ${ipo.status} (${dates})\n`;
+    const statusBadge =
+      ipo.status === 'Open'
+        ? '🟢 OPEN NOW'
+        : ipo.status === 'Upcoming'
+        ? '🔵 UPCOMING'
+        : ipo.status === 'Closed' || ipo.status === 'AllotmentOut'
+        ? `🔴 CLOSED (Listing on ${formatShortDate(ipo.listingDate)})`
+        : `⚪ LISTED (Listed on ${formatShortDate(ipo.listingDate || ipo.closeDate)})`;
+
+    text += `📌 *${r.rank}. ${ipo.name}*\n`;
+    text += `• *Status:* ${statusBadge}\n`;
+    text += `• *Bidding Window:* ${dates}\n`;
     text += `• *Price Band:* ${price} | Min Inv: ₹${(ipo.minimumInvestment || 0).toLocaleString('en-IN')}\n`;
     text += `• *Live GMP:* +₹${gmpVal} (+${gmpPct}%) | Est. Listing: ${estListing}\n`;
     text += `• *Listing Gain Score:* ${ipo.listingGainScore || '-'}/100 | Long-Term: ${ipo.longTermScore || '-'}/100\n`;
-    text += `• *Subscription:* ${sub} | Sector: ${ipo.sector || '-'}\n`;
+    text += `• *Subscription:* ${sub}\n`;
     text += `• *Decision:* _${r.verdict}_\n\n`;
   });
 
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `🔍 *View Complete 30s Visual Breakdown:*\n`;
+  text += `🔍 *View Complete Visual 30-Second Analysis:*\n`;
   text += `👉 ${window.location.origin}\n\n`;
-  text += `_Powered by IPOForge — Research. Analyze. Decide._\n`;
+  text += `_IPOForge — Research. Analyze. Decide._\n`;
   text += `_Created by Shatrughna Ambhore (ambhoreshatrughna@gmail.com)_`;
 
   return text;
 }
 
-export function shareToWhatsApp(ipos: IpoSummary[]): void {
-  const text = generateWhatsAppShareText(ipos);
+export function shareToWhatsApp(ipos: IpoSummary[], activeOnly: boolean = false): void {
+  const text = generateWhatsAppShareText(ipos, activeOnly);
   const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
   window.open(url, '_blank');
 }
