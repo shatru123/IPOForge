@@ -29,6 +29,7 @@ WORKDIR /app
 EXPOSE 5000
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV PORT=5000
+ENV DOTNET_USE_POLLING_FILE_WATCHER=true
 
 COPY --from=backend-build /out ./
 COPY --from=frontend-build /app/frontend/dist ./wwwroot

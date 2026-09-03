@@ -6,6 +6,9 @@ using IPOForge.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Serilog;
 
+// Prevent inotify limit issues in containerized environments (Render / Linux Docker)
+Environment.SetEnvironmentVariable("DOTNET_USE_POLLING_FILE_WATCHER", "true");
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure Serilog
