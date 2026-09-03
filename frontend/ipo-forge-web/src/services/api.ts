@@ -21,7 +21,21 @@ import {
   WatchlistItem,
 } from '../types';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+// In local dev, talk directly to backend on :5050 if running locally, or use VITE_API_BASE_URL / relative path in production
+const getBaseUrl = (): string => {
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    // If frontend is on port 5173, point directly to API port 5050
+    if (window.location.port === '5173') {
+      return 'http://localhost:5050';
+    }
+  }
+  return '';
+};
+
+const BASE_URL = getBaseUrl();
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('ipoforge_token');
