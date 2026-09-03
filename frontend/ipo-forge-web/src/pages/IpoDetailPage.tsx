@@ -26,7 +26,9 @@ import {
   ChevronRight,
   Info,
   Share2,
+  Download,
 } from 'lucide-react';
+import { shareToWhatsApp, generateComparisonImage } from '../utils/imageExporter';
 
 export const IpoDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -138,28 +140,49 @@ export const IpoDetailPage: React.FC = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center space-x-3 self-start md:self-auto">
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+            <button
+              onClick={() => {
+                if (ipo) {
+                  shareToWhatsApp([ipo as any]);
+                }
+              }}
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-950/40 transition flex items-center space-x-1.5"
+              title="Share 30s summary on WhatsApp"
+            >
+              <Share2 className="w-4 h-4" />
+              <span>Share on WhatsApp</span>
+            </button>
+
+            <button
+              onClick={async () => {
+                if (ipo) {
+                  const dataUrl = await generateComparisonImage([ipo as any]);
+                  const link = document.createElement('a');
+                  link.href = dataUrl;
+                  link.download = `${ipo.name.replace(/\s+/g, '_')}_30s_Analysis.png`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }
+              }}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition flex items-center space-x-1.5"
+              title="Download 30s analysis image"
+            >
+              <Download className="w-4 h-4 text-emerald-400" />
+              <span>Download Card</span>
+            </button>
+
             <button
               onClick={() => toggleWatchlist(ipo.id, ipo.name)}
-              className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition flex items-center space-x-2 shadow-lg ${
+              className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition flex items-center space-x-1.5 shadow-lg ${
                 saved
                   ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
                   : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700'
               }`}
             >
               <Bookmark className={`w-4 h-4 ${saved ? 'fill-emerald-400' : ''}`} />
-              <span>{saved ? 'In Watchlist' : 'Add to Watchlist'}</span>
-            </button>
-
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.href);
-                alert('IPO link copied to clipboard!');
-              }}
-              className="p-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 transition"
-              title="Share IPO"
-            >
-              <Share2 className="w-4 h-4" />
+              <span>{saved ? 'Saved' : 'Watchlist'}</span>
             </button>
           </div>
         </div>

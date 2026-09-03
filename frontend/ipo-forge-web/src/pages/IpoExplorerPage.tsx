@@ -5,8 +5,9 @@ import { IpoCard } from '../components/ipo/IpoCard';
 import { IpoTable } from '../components/ipo/IpoTable';
 import { FilterPanel } from '../components/ipo/FilterPanel';
 import { ScoreBreakdownModal } from '../components/common/ScoreBreakdownModal';
+import { IpoComparisonModal } from '../components/comparison/IpoComparisonModal';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { LayoutGrid, List, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutGrid, List, Search, ChevronLeft, ChevronRight, Scale, Share2 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
 export const IpoExplorerPage: React.FC = () => {
@@ -35,6 +36,10 @@ export const IpoExplorerPage: React.FC = () => {
   const [activeBreakdown, setActiveBreakdown] = useState<ScoreBreakdown | null>(null);
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
 
+  // Comparison State
+  const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
+  const [comparisonIpos, setComparisonIpos] = useState<IpoSummary[]>([]);
+
   const sectors = [
     'Technology',
     'Energy & Utilities',
@@ -44,6 +49,7 @@ export const IpoExplorerPage: React.FC = () => {
     'Consumer Staples',
     'Capital Goods & Automation',
     'Healthcare & Pharma',
+    'Infrastructure & Logistics',
   ];
 
   const fetchIpos = async () => {
@@ -56,6 +62,10 @@ export const IpoExplorerPage: React.FC = () => {
       setIpos(res.items);
       setTotalCount(res.totalCount);
       setTotalPages(res.totalPages || 1);
+
+      if (comparisonIpos.length === 0 && res.items.length > 0) {
+        setComparisonIpos(res.items.slice(0, 3));
+      }
     } catch (err) {
       console.error('Failed to fetch IPOs', err);
     } finally {
@@ -96,6 +106,16 @@ export const IpoExplorerPage: React.FC = () => {
     }
   };
 
+  const handleToggleIpoSelection = (ipo: IpoSummary) => {
+    setComparisonIpos((prev) => {
+      if (prev.some((i) => i.id === ipo.id)) {
+        return prev.filter((i) => i.id !== ipo.id);
+      } else {
+        return [...prev, ipo];
+      }
+    });
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Page Header */}
@@ -109,8 +129,16 @@ export const IpoExplorerPage: React.FC = () => {
           </p>
         </div>
 
-        {/* View Switcher */}
-        <div className="flex items-center space-x-2 self-start sm:self-auto">
+        {/* View Switcher & Compare Action */}
+        <div className="flex items-center space-x-3 self-start sm:self-auto">
+          <button
+            onClick={() => setIsComparisonModalOpen(true)}
+            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/40 transition flex items-center space-x-1.5"
+          >
+            <Scale className="w-4 h-4" />
+            <span>Compare & Which to Apply ({comparisonIpos.length})</span>
+          </button>
+
           <div className="bg-slate-900 border border-slate-800 p-1 rounded-xl flex items-center space-x-1">
             <button
               onClick={() => setViewMode('grid')}
@@ -180,9 +208,9 @@ export const IpoExplorerPage: React.FC = () => {
           <p className="text-xs text-slate-500">Try adjusting your score sliders or resetting filters.</p>
           <button
             onClick={handleReset}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-lg text-xs font-semibold transition"
+            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition"
           >
-            Clear All Filters
+            Reset All Filters
           </button>
         </div>
       ) : viewMode === 'grid' ? (
@@ -196,35 +224,44 @@ export const IpoExplorerPage: React.FC = () => {
           ))}
         </div>
       ) : (
-        <IpoTable ipos={ipos} onOpenScoreBreakdown={handleOpenScoreBreakdown} />
+        <IpoTable
+          ipos={ipos}
+          onOpenScoreBreakdown={handleOpenScoreBreakdown}
+        />
       )}
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center space-x-2 pt-6">
-          <button
-            disabled={pageNumber <= 1}
-            onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
-            className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <span className="text-xs font-mono text-slate-400 px-3">
-            Page {pageNumber} of {totalPages}
-          </span>
-          <button
-            disabled={pageNumber >= totalPages}
-            onClick={() => setPageNumber((p) => Math.min(totalPages, p + 1))}
-            className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+        <div className="flex items-center justify-between pt-4 border-t border-slate-800 text-xs text-slate-400">
+          <div>
+            Page <span className="font-bold text-white">{pageNumber}</span> of{' '}
+            <span className="font-bold text-white">{totalPages}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
+              disabled={pageNumber === 1}
+              className="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center space-x-1"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Previous</span>
+            </button>
+            <button
+              onClick={() => setPageNumber((p) => Math.min(totalPages, p + 1))}
+              disabled={pageNumber === totalPages}
+              className="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center space-x-1"
+            >
+              <span>Next</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
+      {/* Statutory Disclaimer */}
       <DisclaimerBanner />
 
-      {/* Scoring Transparency Modal */}
+      {/* Score Transparency Modal */}
       {selectedIpoForScore && activeBreakdown && (
         <ScoreBreakdownModal
           scores={activeBreakdown}
@@ -237,6 +274,15 @@ export const IpoExplorerPage: React.FC = () => {
           }}
         />
       )}
+
+      {/* Comparison Modal */}
+      <IpoComparisonModal
+        ipos={comparisonIpos}
+        allAvailableIpos={ipos}
+        isOpen={isComparisonModalOpen}
+        onClose={() => setIsComparisonModalOpen(false)}
+        onToggleIpoSelection={handleToggleIpoSelection}
+      />
     </div>
   );
 };

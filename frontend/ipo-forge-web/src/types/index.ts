@@ -357,8 +357,11 @@ export interface DashboardSummary {
   activeOpenIposCount: number;
   upcomingIposCount: number;
   recentlyListedCount: number;
-  averageGmpThisMonth: number;
-  averageSubscriptionMultiple: number;
+  averageGmpPercent?: number;
+  averageGmpThisMonth?: number;
+  averageSubscriptionX?: number;
+  averageSubscriptionMultiple?: number;
+  averageListingGainPercent?: number;
   openIpos: IpoSummary[];
   upcomingIpos: IpoSummary[];
   recentlyListedIpos: IpoSummary[];
