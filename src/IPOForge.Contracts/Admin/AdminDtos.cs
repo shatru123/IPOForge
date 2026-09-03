@@ -19,6 +19,17 @@ public class DataRefreshStatusDto
     public string Details { get; set; } = string.Empty;
 }
 
+public class DataRefreshLogDto
+{
+    public Guid Id { get; set; }
+    public string Source { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public int RecordsUpdated { get; set; }
+    public string? ErrorMessage { get; set; }
+    public long DurationMs { get; set; }
+    public DateTime ExecutedAt { get; set; }
+}
+
 public class DataSourceStatusDto
 {
     public Guid Id { get; set; }
@@ -29,4 +40,11 @@ public class DataSourceStatusDto
     public DateTime? LastSyncAt { get; set; }
     public string HealthStatus { get; set; } = string.Empty;
     public int ErrorCount { get; set; }
+}
+
+public class AdminSyncStatusDto
+{
+    public DateTime? LastSyncTime { get; set; }
+    public IReadOnlyList<DataSourceStatusDto> DataSources { get; set; } = Array.Empty<DataSourceStatusDto>();
+    public IReadOnlyList<DataRefreshLogDto> RecentLogs { get; set; } = Array.Empty<DataRefreshLogDto>();
 }

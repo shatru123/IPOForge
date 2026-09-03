@@ -1,7 +1,6 @@
 using IPOForge.Application.Interfaces;
 using IPOForge.Contracts.Common;
 using IPOForge.Contracts.Gmp;
-using IPOForge.Contracts.Ipo;
 using IPOForge.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +21,7 @@ public class GmpController : ControllerBase
     }
 
     [HttpGet("movers")]
+    [HttpGet("top-movers")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<GmpMoverDto>>>> GetGmpMovers(
         [FromQuery] int count = 10,
         CancellationToken cancellationToken = default)
@@ -36,6 +36,7 @@ public class GmpController : ControllerBase
     }
 
     [HttpGet("analytics")]
+    [HttpGet("accuracy")]
     public async Task<ActionResult<ApiResponse<GmpAccuracyAnalyticsDto>>> GetAccuracyAnalytics(CancellationToken cancellationToken = default)
     {
         var listedIpos = await _context.IPOs

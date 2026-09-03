@@ -26,6 +26,45 @@ public class AdminController : ControllerBase
         return Ok(ApiResponse<DataRefreshStatusDto>.Ok(status));
     }
 
+    [HttpGet("status")]
+    public async Task<ActionResult<ApiResponse<AdminSyncStatusDto>>> GetAdminStatus(CancellationToken cancellationToken)
+    {
+        var sources = await _refreshService.GetDataSourcesAsync(cancellationToken);
+        var logs = await _refreshService.GetRefreshLogsAsync(20, cancellationToken);
+
+        var sourceDtos = sources.Select(s => new DataSourceStatusDto
+        {
+            Id = s.Id,
+            Name = s.Name,
+            ProviderKey = s.ProviderKey,
+            SourceType = s.SourceType,
+            IsActive = s.IsActive,
+            LastSyncAt = s.LastSyncAt,
+            HealthStatus = s.HealthStatus,
+            ErrorCount = s.ErrorCount
+        }).ToList();
+
+        var logDtos = logs.Select(l => new DataRefreshLogDto
+        {
+            Id = l.Id,
+            Source = l.TriggerType,
+            Status = l.Status,
+            RecordsUpdated = l.RecordsProcessed,
+            ErrorMessage = l.ErrorMessage,
+            DurationMs = (long)((l.CompletedAt ?? l.StartedAt) - l.StartedAt).TotalMilliseconds,
+            ExecutedAt = l.StartedAt
+        }).ToList();
+
+        var latestSync = logs.OrderByDescending(l => l.StartedAt).FirstOrDefault()?.StartedAt ?? DateTime.UtcNow;
+
+        return Ok(ApiResponse<AdminSyncStatusDto>.Ok(new AdminSyncStatusDto
+        {
+            LastSyncTime = latestSync,
+            DataSources = sourceDtos,
+            RecentLogs = logDtos
+        }));
+    }
+
     [HttpGet("refresh-logs")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<Domain.Entities.DataRefreshLog>>>> GetRefreshLogs(
         [FromQuery] int limit = 50,
