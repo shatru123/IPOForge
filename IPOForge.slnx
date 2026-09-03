@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/IPOForge.Api/IPOForge.Api.csproj" />
+    <Project Path="src/IPOForge.Application/IPOForge.Application.csproj" />
+    <Project Path="src/IPOForge.Contracts/IPOForge.Contracts.csproj" />
+    <Project Path="src/IPOForge.Domain/IPOForge.Domain.csproj" />
+    <Project Path="src/IPOForge.Infrastructure/IPOForge.Infrastructure.csproj" />
+    <Project Path="src/IPOForge.Worker/IPOForge.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/IPOForge.IntegrationTests/IPOForge.IntegrationTests.csproj" />
+    <Project Path="tests/IPOForge.UnitTests/IPOForge.UnitTests.csproj" />
+  </Folder>
+</Solution>

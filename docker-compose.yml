@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ipoforge-db
+    environment:
+      POSTGRES_DB: IPOForgeDb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d IPOForgeDb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ipoforge-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - PORT=5000
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=IPOForgeDb;Username=postgres;Password=postgrespassword
+      - Jwt__SecretKey=IPOForge_Super_Secret_Production_Grade_JWT_Key_2025_Min32Bytes!
+      - Jwt__Issuer=IPOForge.Api
+      - Jwt__Audience=IPOForge.Client
+      - FrontendUrl=http://localhost:5000
+    ports:
+      - "5000:5000"
+
+volumes:
+  postgres_data:

@@ -1,0 +1,29 @@
+services:
+  # 1. IPOForge Full-Stack Web Service (ASP.NET Core Web API + Bundled React SPA)
+  - type: web
+    name: ipoforge-app
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__DefaultConnection
+        fromDatabase:
+          name: ipoforge-postgres
+          property: connectionString
+      - key: Jwt__SecretKey
+        generateValue: true
+      - key: Jwt__Issuer
+        value: IPOForge.Api
+      - key: Jwt__Audience
+        value: IPOForge.Client
+
+databases:
+  # 2. Free Tier Managed PostgreSQL Database
+  - name: ipoforge-postgres
+    plan: free
+    region: oregon
+    databaseName: ipoforgedb
+    user: ipoforge_user

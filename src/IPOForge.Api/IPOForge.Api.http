@@ -1,0 +1,6 @@
+@IPOForge.Api_HostAddress = http://localhost:5285
+
+GET {{IPOForge.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
