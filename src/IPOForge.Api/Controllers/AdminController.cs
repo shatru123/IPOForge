@@ -19,10 +19,16 @@ public class AdminController : ControllerBase
     [HttpPost("data-refresh")]
     public async Task<ActionResult<ApiResponse<DataRefreshStatusDto>>> TriggerDataRefresh(
         [FromBody] DataRefreshRequest? request,
+        [FromQuery] bool? fullSync,
         CancellationToken cancellationToken)
     {
         request ??= new DataRefreshRequest();
+        if (fullSync.HasValue)
+        {
+            request.ForceFullSync = fullSync.Value;
+        }
         var status = await _refreshService.RefreshMarketDataAsync(request, cancellationToken);
+        status.Message = !string.IsNullOrWhiteSpace(status.Details) ? status.Details : $"Data synchronization completed successfully. {status.RecordsProcessed} records updated.";
         return Ok(ApiResponse<DataRefreshStatusDto>.Ok(status));
     }
 

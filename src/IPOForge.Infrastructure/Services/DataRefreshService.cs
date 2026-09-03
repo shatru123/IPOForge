@@ -48,13 +48,11 @@ public class DataRefreshService : IDataRefreshService
     {
         var log = new DataRefreshLog
         {
+            Id = Guid.NewGuid(),
             TriggerType = request.ForceFullSync ? "ManualAdminFullSync" : "ManualAdminIncremental",
             Status = "InProgress",
             StartedAt = DateTime.UtcNow
         };
-
-        await _context.DataRefreshLogs.AddAsync(log, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
 
         int recordsProcessed = 0;
 
@@ -85,7 +83,6 @@ public class DataRefreshService : IDataRefreshService
 
                 if (match == null)
                 {
-                    await _context.Companies.AddAsync(liveIpo.Company, cancellationToken);
                     await _context.IPOs.AddAsync(liveIpo, cancellationToken);
                     existingIpos.Add(liveIpo);
                 }
@@ -95,13 +92,18 @@ public class DataRefreshService : IDataRefreshService
                     match.Status = liveIpo.Status;
                     match.PriceBandHigh = liveIpo.PriceBandHigh > 0 ? liveIpo.PriceBandHigh : match.PriceBandHigh;
                     match.PriceBandLow = liveIpo.PriceBandLow > 0 ? liveIpo.PriceBandLow : match.PriceBandLow;
+                    match.OpenDate = liveIpo.OpenDate ?? match.OpenDate;
+                    match.CloseDate = liveIpo.CloseDate ?? match.CloseDate;
+                    match.AllotmentDate = liveIpo.AllotmentDate ?? match.AllotmentDate;
+                    match.ListingDate = liveIpo.ListingDate ?? match.ListingDate;
                     match.UpdatedAt = DateTime.UtcNow;
 
                     var latestGmp = liveIpo.GmpHistories.LastOrDefault();
                     if (latestGmp != null)
                     {
-                        match.GmpHistories.Add(new IPOGmpHistory
+                        var gmpHistory = new IPOGmpHistory
                         {
+                            Id = Guid.NewGuid(),
                             IpoId = match.Id,
                             GMP = latestGmp.GMP,
                             GMPPercentage = latestGmp.GMPPercentage,
@@ -109,24 +111,15 @@ public class DataRefreshService : IDataRefreshService
                             Source = "Live Real-Time Unofficial Aggregator",
                             ObservedAt = DateTime.UtcNow,
                             RetrievedAt = DateTime.UtcNow
-                        });
+                        };
+                        await _context.IPOGmpHistories.AddAsync(gmpHistory, cancellationToken);
+                        match.GmpHistories.Add(gmpHistory);
                     }
                 }
             }
 
-            await _context.SaveChangesAsync(cancellationToken);
-
             // 3. Recalculate deterministic scores and valuations across all active & real IPOs
-            var allIpos = await _context.IPOs
-                .Include(i => i.Company).ThenInclude(c => c.Financials)
-                .Include(i => i.GmpHistories)
-                .Include(i => i.SubscriptionHistories)
-                .Include(i => i.Objectives)
-                .Include(i => i.Risks)
-                .Include(i => i.Scores)
-                .ToListAsync(cancellationToken);
-
-            foreach (var ipo in allIpos)
+            foreach (var ipo in existingIpos)
             {
                 recordsProcessed++;
                 var ind = industryMetrics.FirstOrDefault(m => m.Sector == ipo.Company.Sector);
@@ -163,8 +156,9 @@ public class DataRefreshService : IDataRefreshService
                 }
                 else
                 {
-                    ipo.Scores.Add(new IPOScore
+                    var newScore = new IPOScore
                     {
+                        Id = Guid.NewGuid(),
                         IpoId = ipo.Id,
                         ListingGainScore = scoreBreakdown.ListingGainScore,
                         ListingRecommendation = scoreBreakdown.ListingRecommendation,
@@ -174,18 +168,19 @@ public class DataRefreshService : IDataRefreshService
                         LongTermVerdict = scoreBreakdown.LongTermVerdict,
                         BreakdownJson = JsonSerializer.Serialize(scoreBreakdown),
                         CalculatedAt = DateTime.UtcNow
-                    });
+                    };
+                    await _context.IPOScores.AddAsync(newScore, cancellationToken);
+                    ipo.Scores.Add(newScore);
                 }
             }
-
-            // Invalidate cache
-            await _cache.RemoveAsync("dashboard_summary_cache_key", cancellationToken);
 
             log.Status = "Completed";
             log.CompletedAt = DateTime.UtcNow;
             log.RecordsProcessed = recordsProcessed;
             log.DetailsJson = JsonSerializer.Serialize(new { Message = $"Live sync successfully parsed {liveIpos.Count} real IPOs and recomputed metrics for {recordsProcessed} total entries." });
 
+            await _context.DataRefreshLogs.AddAsync(log, cancellationToken);
+            await _cache.RemoveAsync("dashboard_summary_cache_key", cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Market data sync finished successfully. {RecordsProcessed} live records active.", recordsProcessed);
 
@@ -205,7 +200,12 @@ public class DataRefreshService : IDataRefreshService
             log.Status = "Failed";
             log.CompletedAt = DateTime.UtcNow;
             log.ErrorMessage = ex.Message;
-            await _context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await _context.DataRefreshLogs.AddAsync(log, cancellationToken);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            catch { }
 
             return new DataRefreshStatusDto
             {

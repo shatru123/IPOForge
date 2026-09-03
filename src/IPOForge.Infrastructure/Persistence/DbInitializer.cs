@@ -607,6 +607,7 @@ public static class DbInitializer
 
                         var scoreEntity = new IPOScore
                         {
+                            Id = Guid.NewGuid(),
                             IpoId = ipo.Id,
                             ListingGainScore = scoreBreakdown.ListingGainScore,
                             ListingRecommendation = scoreBreakdown.ListingRecommendation,

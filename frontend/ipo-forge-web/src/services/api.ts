@@ -180,8 +180,9 @@ export const api = {
 
   // Admin
   triggerDataRefresh: (fullSync = true) =>
-    request<{ message: string; refreshedAt: string }>(`/api/admin/data-refresh?fullSync=${fullSync}`, {
+    request<{ message: string; details?: string; recordsProcessed?: number }>('/api/admin/data-refresh', {
       method: 'POST',
+      body: JSON.stringify({ forceFullSync: fullSync, refreshGmpOnly: false }),
     }),
   getAdminStatus: () => request<AdminSyncStatus>('/api/admin/status'),
 };

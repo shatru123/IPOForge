@@ -17,6 +17,7 @@ public class DataRefreshStatusDto
     public int RecordsProcessed { get; set; }
     public string? ErrorMessage { get; set; }
     public string Details { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
 }
 
 public class DataRefreshLogDto
