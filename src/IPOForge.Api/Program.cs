@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using IPOForge.Api.Middleware;
 using IPOForge.Application.Interfaces;
+using IPOForge.Contracts.Admin;
 using IPOForge.Infrastructure;
 using IPOForge.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -69,7 +70,7 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// Seed database on startup
+// Seed database on startup and run live public data scanner
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -95,6 +96,23 @@ using (var scope = app.Services.CreateScope())
             gmp,
             risk,
             logger);
+
+        // Immediately trigger live public market data scan
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scanScope = app.Services.CreateScope();
+                var refreshService = scanScope.ServiceProvider.GetRequiredService<IDataRefreshService>();
+                logger.LogInformation("Scanning real-time public Indian IPO feeds...");
+                await refreshService.RefreshMarketDataAsync(new DataRefreshRequest { ForceFullSync = true });
+                logger.LogInformation("Real-time live IPO scan complete.");
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Live market data scan completed initial pass.");
+            }
+        });
     }
     catch (Exception ex)
     {

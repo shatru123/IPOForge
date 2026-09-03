@@ -2,6 +2,8 @@ using System.Text.Json;
 using IPOForge.Application.Interfaces;
 using IPOForge.Contracts.Admin;
 using IPOForge.Domain.Entities;
+using IPOForge.Domain.Enums;
+using IPOForge.Infrastructure.DataProviders;
 using IPOForge.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -11,8 +13,7 @@ namespace IPOForge.Infrastructure.Services;
 public class DataRefreshService : IDataRefreshService
 {
     private readonly IpoForgeDbContext _context;
-    private readonly IGmpDataProvider _gmpProvider;
-    private readonly ISubscriptionDataProvider _subProvider;
+    private readonly PublicScraperDataProvider _publicScraper;
     private readonly IIpoScoringEngine _scoringEngine;
     private readonly IFinancialAnalysisEngine _financialEngine;
     private readonly IValuationEngine _valuationEngine;
@@ -23,8 +24,7 @@ public class DataRefreshService : IDataRefreshService
 
     public DataRefreshService(
         IpoForgeDbContext context,
-        IGmpDataProvider gmpProvider,
-        ISubscriptionDataProvider subProvider,
+        PublicScraperDataProvider publicScraper,
         IIpoScoringEngine scoringEngine,
         IFinancialAnalysisEngine financialEngine,
         IValuationEngine valuationEngine,
@@ -34,8 +34,7 @@ public class DataRefreshService : IDataRefreshService
         ILogger<DataRefreshService> logger)
     {
         _context = context;
-        _gmpProvider = gmpProvider;
-        _subProvider = subProvider;
+        _publicScraper = publicScraper;
         _scoringEngine = scoringEngine;
         _financialEngine = financialEngine;
         _valuationEngine = valuationEngine;
@@ -61,13 +60,12 @@ public class DataRefreshService : IDataRefreshService
 
         try
         {
-            _logger.LogInformation("Starting IPOForge market data refresh operation. Request: {@Request}", request);
+            _logger.LogInformation("Starting live real-time Indian IPO market data sync...");
 
-            // Fetch live / public data feeds
-            var latestGmps = await _gmpProvider.GetLatestGmpAsync(cancellationToken);
-            var latestSubs = await _subProvider.GetLiveSubscriptionsAsync(cancellationToken);
+            // 1. Fetch live real IPOs from public market aggregator
+            var liveIpos = await _publicScraper.FetchRealLiveIposAsync(cancellationToken);
 
-            var ipos = await _context.IPOs
+            var existingIpos = await _context.IPOs
                 .Include(i => i.Company).ThenInclude(c => c.Financials)
                 .Include(i => i.GmpHistories)
                 .Include(i => i.SubscriptionHistories)
@@ -78,7 +76,57 @@ public class DataRefreshService : IDataRefreshService
 
             var industryMetrics = await _context.IndustryMetrics.ToListAsync(cancellationToken);
 
-            foreach (var ipo in ipos)
+            // 2. Ingest or update live IPOs
+            foreach (var liveIpo in liveIpos)
+            {
+                var match = existingIpos.FirstOrDefault(e =>
+                    e.Name.Equals(liveIpo.Name, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrEmpty(e.Symbol) && e.Symbol.Equals(liveIpo.Symbol, StringComparison.OrdinalIgnoreCase)));
+
+                if (match == null)
+                {
+                    await _context.Companies.AddAsync(liveIpo.Company, cancellationToken);
+                    await _context.IPOs.AddAsync(liveIpo, cancellationToken);
+                    existingIpos.Add(liveIpo);
+                }
+                else
+                {
+                    // Update latest market price & GMP
+                    match.Status = liveIpo.Status;
+                    match.PriceBandHigh = liveIpo.PriceBandHigh > 0 ? liveIpo.PriceBandHigh : match.PriceBandHigh;
+                    match.PriceBandLow = liveIpo.PriceBandLow > 0 ? liveIpo.PriceBandLow : match.PriceBandLow;
+                    match.UpdatedAt = DateTime.UtcNow;
+
+                    var latestGmp = liveIpo.GmpHistories.LastOrDefault();
+                    if (latestGmp != null)
+                    {
+                        match.GmpHistories.Add(new IPOGmpHistory
+                        {
+                            IpoId = match.Id,
+                            GMP = latestGmp.GMP,
+                            GMPPercentage = latestGmp.GMPPercentage,
+                            EstimatedListingPrice = latestGmp.EstimatedListingPrice,
+                            Source = "Live Real-Time Unofficial Aggregator",
+                            ObservedAt = DateTime.UtcNow,
+                            RetrievedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            // 3. Recalculate deterministic scores and valuations across all active & real IPOs
+            var allIpos = await _context.IPOs
+                .Include(i => i.Company).ThenInclude(c => c.Financials)
+                .Include(i => i.GmpHistories)
+                .Include(i => i.SubscriptionHistories)
+                .Include(i => i.Objectives)
+                .Include(i => i.Risks)
+                .Include(i => i.Scores)
+                .ToListAsync(cancellationToken);
+
+            foreach (var ipo in allIpos)
             {
                 recordsProcessed++;
                 var ind = industryMetrics.FirstOrDefault(m => m.Sector == ipo.Company.Sector);
@@ -130,16 +178,16 @@ public class DataRefreshService : IDataRefreshService
                 }
             }
 
-            // Invalidate dashboard and list caches
+            // Invalidate cache
             await _cache.RemoveAsync("dashboard_summary_cache_key", cancellationToken);
 
             log.Status = "Completed";
             log.CompletedAt = DateTime.UtcNow;
             log.RecordsProcessed = recordsProcessed;
-            log.DetailsJson = JsonSerializer.Serialize(new { Message = $"Successfully synchronized {recordsProcessed} IPO entries and recomputed analytics." });
+            log.DetailsJson = JsonSerializer.Serialize(new { Message = $"Live sync successfully parsed {liveIpos.Count} real IPOs and recomputed metrics for {recordsProcessed} total entries." });
 
             await _context.SaveChangesAsync(cancellationToken);
-            _logger.LogInformation("Market data refresh completed successfully. {RecordsProcessed} records updated.", recordsProcessed);
+            _logger.LogInformation("Market data sync finished successfully. {RecordsProcessed} live records active.", recordsProcessed);
 
             return new DataRefreshStatusDto
             {
@@ -148,12 +196,12 @@ public class DataRefreshService : IDataRefreshService
                 StartedAt = log.StartedAt,
                 CompletedAt = log.CompletedAt,
                 RecordsProcessed = recordsProcessed,
-                Details = "Successfully refreshed IPO market data, valuations, and deterministic scores."
+                Details = $"Successfully synchronized {liveIpos.Count} live real-time Indian IPOs with 19-pillar deterministic scoring."
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during data refresh.");
+            _logger.LogError(ex, "Error during live data refresh.");
             log.Status = "Failed";
             log.CompletedAt = DateTime.UtcNow;
             log.ErrorMessage = ex.Message;
@@ -166,7 +214,7 @@ public class DataRefreshService : IDataRefreshService
                 StartedAt = log.StartedAt,
                 CompletedAt = log.CompletedAt,
                 ErrorMessage = ex.Message,
-                Details = "Data refresh encountered an error."
+                Details = "Live data sync encountered an error."
             };
         }
     }
