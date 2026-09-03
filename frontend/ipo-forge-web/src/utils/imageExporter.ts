@@ -32,12 +32,16 @@ export function evaluateComparison(ipos: IpoSummary[]): ComparisonDecision {
     const listScore = ipo.listingGainScore ?? 50;
     const ltScore = ipo.longTermScore ?? 50;
     const gmpPct = ipo.latestGmpPercentage ?? 0;
-    const isOpen = ipo.status === 'Open';
-    const isUpcoming = ipo.status === 'Upcoming';
-    const isClosed = ipo.status === 'Closed' || ipo.status === 'AllotmentOut';
-    const isListed = ipo.status === 'Listed';
 
-    const isApplyable = isOpen || isUpcoming;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isCloseDateTodayOrPast = ipo.closeDate ? ipo.closeDate.split('T')[0] <= todayStr : false;
+
+    const isListed = ipo.status === 'Listed';
+    const isClosed = ipo.status === 'Closed' || ipo.status === 'AllotmentOut' || isCloseDateTodayOrPast;
+    const isOpen = ipo.status === 'Open' && !isCloseDateTodayOrPast;
+    const isUpcoming = ipo.status === 'Upcoming' && !isCloseDateTodayOrPast;
+
+    const isApplyable = !isListed && !isClosed && (isOpen || isUpcoming);
 
     let applyAdvice: 'Strong Apply' | 'Apply for Listing Gains' | 'Long-Term Only' | 'Neutral' | 'Avoid' | 'Closed' | 'Listed';
     let badge = 'Neutral';
@@ -325,8 +329,12 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
 }
 
 export function generateWhatsAppShareText(ipos: IpoSummary[], activeOnly: boolean = false): string {
+  const todayStr = new Date().toISOString().split('T')[0];
   const targetIpos = activeOnly
-    ? ipos.filter((i) => i.status === 'Open' || i.status === 'Upcoming')
+    ? ipos.filter((i) => {
+        const isClosedOrClosingToday = i.closeDate ? i.closeDate.split('T')[0] <= todayStr : false;
+        return (i.status === 'Open' || i.status === 'Upcoming') && !isClosedOrClosingToday;
+      })
     : ipos;
 
   const decision = evaluateComparison(targetIpos.length > 0 ? targetIpos : ipos);
@@ -351,15 +359,16 @@ export function generateWhatsAppShareText(ipos: IpoSummary[], activeOnly: boolea
     const estListing = ipo.estimatedListingPrice ? `₹${ipo.estimatedListingPrice}` : 'TBD';
     const dates = `${formatShortDate(ipo.openDate)} to ${formatShortDate(ipo.closeDate)}`;
     const sub = ipo.status === 'Upcoming' ? 'Bidding Soon' : `${ipo.totalSubscription || '-'}x`;
+    const isClosedOrClosingToday = ipo.closeDate ? ipo.closeDate.split('T')[0] <= todayStr : false;
 
     const statusBadge =
-      ipo.status === 'Open'
-        ? '🟢 OPEN NOW'
-        : ipo.status === 'Upcoming'
-        ? '🔵 UPCOMING'
-        : ipo.status === 'Closed' || ipo.status === 'AllotmentOut'
-        ? `🔴 CLOSED (Listing on ${formatShortDate(ipo.listingDate)})`
-        : `⚪ LISTED (Listed on ${formatShortDate(ipo.listingDate || ipo.closeDate)})`;
+      ipo.status === 'Listed'
+        ? `⚪ LISTED (Listed on ${formatShortDate(ipo.listingDate || ipo.closeDate)})`
+        : ipo.status === 'Closed' || ipo.status === 'AllotmentOut' || isClosedOrClosingToday
+        ? `🔴 CLOSED (Bidding ended on ${formatShortDate(ipo.closeDate)} • Listing on ${formatShortDate(ipo.listingDate)})`
+        : ipo.status === 'Open'
+        ? `🟢 OPEN NOW (Closes on ${formatShortDate(ipo.closeDate)})`
+        : `🔵 UPCOMING (Opens on ${formatShortDate(ipo.openDate)})`;
 
     text += `📌 *${r.rank}. ${ipo.name}*\n`;
     text += `• *Status:* ${statusBadge}\n`;

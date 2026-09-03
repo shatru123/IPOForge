@@ -191,6 +191,24 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
                 var allotmentDate = closeDate.Value.AddDays(2);
                 var listingDate = closeDate.Value.AddDays(5);
 
+                // Ensure strict lifecycle alignment so bidding closing today/past is never shown as Open
+                var todayUtc = DateTime.UtcNow.Date;
+                if (status != IpoStatus.Listed)
+                {
+                    if (closeDate.Value.Date <= todayUtc)
+                    {
+                        status = IpoStatus.Closed;
+                    }
+                    else if (openDate.Value.Date > todayUtc)
+                    {
+                        status = IpoStatus.Upcoming;
+                    }
+                    else if (openDate.Value.Date <= todayUtc && closeDate.Value.Date > todayUtc)
+                    {
+                        status = IpoStatus.Open;
+                    }
+                }
+
                 var sector = InferSector(cleanName);
                 var symbol = GenerateSymbol(cleanName);
 

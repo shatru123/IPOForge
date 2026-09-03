@@ -279,11 +279,13 @@ public class IpoService : IIpoService
             .Include(i => i.SubscriptionHistories)
             .Include(i => i.Risks)
             .Include(i => i.Scores)
-            .Where(i => i.Status == IpoStatus.Upcoming)
             .OrderBy(i => i.OpenDate)
             .ToListAsync(cancellationToken);
 
-        return list.Select(MapToSummaryDto).ToList();
+        return list
+            .Select(MapToSummaryDto)
+            .Where(s => s.Status == IpoStatus.Upcoming)
+            .ToList();
     }
 
     public async Task<IReadOnlyList<IpoSummaryDto>> GetOpenIposAsync(CancellationToken cancellationToken = default)
@@ -295,11 +297,13 @@ public class IpoService : IIpoService
             .Include(i => i.SubscriptionHistories)
             .Include(i => i.Risks)
             .Include(i => i.Scores)
-            .Where(i => i.Status == IpoStatus.Open)
             .OrderBy(i => i.CloseDate)
             .ToListAsync(cancellationToken);
 
-        return list.Select(MapToSummaryDto).ToList();
+        return list
+            .Select(MapToSummaryDto)
+            .Where(s => s.Status == IpoStatus.Open)
+            .ToList();
     }
 
     public async Task<IReadOnlyList<IpoSummaryDto>> GetListedIposAsync(CancellationToken cancellationToken = default)
@@ -491,11 +495,29 @@ public class IpoService : IIpoService
             else { dynamicLtScore = 68; dynamicLtRec = RecommendationRating.Positive; }
         }
 
+        var todayUtc = DateTime.UtcNow.Date;
+        var status = ipo.Status;
+        if (status != IpoStatus.Listed)
+        {
+            if (ipo.CloseDate.HasValue && ipo.CloseDate.Value.Date <= todayUtc)
+            {
+                status = IpoStatus.Closed;
+            }
+            else if (ipo.OpenDate.HasValue && ipo.OpenDate.Value.Date > todayUtc)
+            {
+                status = IpoStatus.Upcoming;
+            }
+            else if (ipo.OpenDate.HasValue && ipo.OpenDate.Value.Date <= todayUtc && ipo.CloseDate.HasValue && ipo.CloseDate.Value.Date > todayUtc)
+            {
+                status = IpoStatus.Open;
+            }
+        }
+
         // Subscription: only show if open/closed/listed
-        decimal? totalSub = ipo.Status == IpoStatus.Upcoming ? null : latestSub?.TotalSubscription;
-        decimal? qibSub = ipo.Status == IpoStatus.Upcoming ? null : latestSub?.QibSubscription;
-        decimal? retailSub = ipo.Status == IpoStatus.Upcoming ? null : latestSub?.RetailSubscription;
-        decimal? niiSub = ipo.Status == IpoStatus.Upcoming ? null : latestSub?.NiiSubscription;
+        decimal? totalSub = status == IpoStatus.Upcoming ? null : latestSub?.TotalSubscription;
+        decimal? qibSub = status == IpoStatus.Upcoming ? null : latestSub?.QibSubscription;
+        decimal? retailSub = status == IpoStatus.Upcoming ? null : latestSub?.RetailSubscription;
+        decimal? niiSub = status == IpoStatus.Upcoming ? null : latestSub?.NiiSubscription;
 
         return new IpoSummaryDto
         {
@@ -506,7 +528,7 @@ public class IpoService : IIpoService
             Sector = ipo.Company?.Sector ?? string.Empty,
             Industry = ipo.Company?.Industry ?? string.Empty,
             IpoType = ipo.IpoType,
-            Status = ipo.Status,
+            Status = status,
             OpenDate = ipo.OpenDate,
             CloseDate = ipo.CloseDate,
             AllotmentDate = ipo.AllotmentDate,
