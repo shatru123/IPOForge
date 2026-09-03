@@ -14,6 +14,11 @@ interface IpoTableProps {
 export const IpoTable: React.FC<IpoTableProps> = ({ ipos, onOpenScoreBreakdown }) => {
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
 
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+  };
+
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/60 shadow-xl">
       <table className="w-full text-left text-xs text-slate-300">
@@ -22,6 +27,7 @@ export const IpoTable: React.FC<IpoTableProps> = ({ ipos, onOpenScoreBreakdown }
             <th className="py-3.5 px-4">IPO & Company</th>
             <th className="py-3.5 px-4">Status & Type</th>
             <th className="py-3.5 px-4 text-center">Scores (Gain / LT)</th>
+            <th className="py-3.5 px-4">Issue Dates</th>
             <th className="py-3.5 px-4">Price Band</th>
             <th className="py-3.5 px-4">Issue Size</th>
             <th className="py-3.5 px-4">Current GMP</th>
@@ -70,20 +76,43 @@ export const IpoTable: React.FC<IpoTableProps> = ({ ipos, onOpenScoreBreakdown }
                   <div className="flex items-center justify-center space-x-2">
                     <button
                       onClick={() => onOpenScoreBreakdown && onOpenScoreBreakdown(ipo)}
-                      className="px-2 py-1 rounded bg-slate-800 border border-slate-700 hover:border-emerald-500 font-mono font-bold text-emerald-400 text-xs transition"
+                      className={`px-2 py-1 rounded font-mono font-bold text-xs border transition ${
+                        (ipo.listingGainScore || 0) >= 75
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:border-emerald-400'
+                          : (ipo.listingGainScore || 0) >= 50
+                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:border-amber-400'
+                          : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:border-rose-400'
+                      }`}
                       title="Listing Gain Score"
                     >
-                      {ipo.listingGainScore}
+                      {ipo.listingGainScore ?? '-'}
                     </button>
                     <span className="text-slate-600">/</span>
                     <button
                       onClick={() => onOpenScoreBreakdown && onOpenScoreBreakdown(ipo)}
-                      className="px-2 py-1 rounded bg-slate-800 border border-slate-700 hover:border-blue-500 font-mono font-bold text-blue-400 text-xs transition"
+                      className={`px-2 py-1 rounded font-mono font-bold text-xs border transition ${
+                        (ipo.longTermScore || 0) >= 75
+                          ? 'bg-blue-500/10 border-blue-500/30 text-blue-400 hover:border-blue-400'
+                          : (ipo.longTermScore || 0) >= 50
+                          ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-500'
+                          : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:border-rose-400'
+                      }`}
                       title="Long-Term Score"
                     >
-                      {ipo.longTermScore}
+                      {ipo.longTermScore ?? '-'}
                     </button>
                   </div>
+                </td>
+
+                {/* Dates */}
+                <td className="py-3.5 px-4 text-[11px] text-slate-300 font-mono">
+                  {ipo.status === 'Listed' ? (
+                    <span className="text-slate-400">Listed: {formatDate(ipo.listingDate || ipo.closeDate)}</span>
+                  ) : ipo.status === 'Closed' ? (
+                    <span className="text-amber-400/80">Closed: {formatDate(ipo.closeDate)}</span>
+                  ) : (
+                    <span>{formatDate(ipo.openDate)} - {formatDate(ipo.closeDate)}</span>
+                  )}
                 </td>
 
                 {/* Price */}
@@ -105,8 +134,14 @@ export const IpoTable: React.FC<IpoTableProps> = ({ ipos, onOpenScoreBreakdown }
                 </td>
 
                 {/* Subscription */}
-                <td className="py-3.5 px-4 font-mono font-semibold text-emerald-400">
-                  {ipo.totalSubscription !== undefined ? `${ipo.totalSubscription}x` : '-'}
+                <td className="py-3.5 px-4 font-mono font-semibold">
+                  {ipo.status === 'Upcoming' ? (
+                    <span className="text-slate-500 text-[11px] font-normal">Soon</span>
+                  ) : ipo.totalSubscription !== undefined && ipo.totalSubscription !== null && ipo.totalSubscription > 0 ? (
+                    <span className="text-emerald-400">{ipo.totalSubscription}x</span>
+                  ) : (
+                    <span className="text-slate-500 text-[11px] font-normal">—</span>
+                  )}
                 </td>
 
                 {/* Actions */}

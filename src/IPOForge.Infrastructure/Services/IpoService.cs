@@ -461,6 +461,42 @@ public class IpoService : IIpoService
 
         var gmpPercent = latestGmp?.GMPPercentage ?? (ipo.PriceBandHigh > 0 && latestGmp != null ? Math.Round((latestGmp.GMP / ipo.PriceBandHigh) * 100, 2) : 0);
 
+        int dynamicListingScore;
+        RecommendationRating dynamicListingRec;
+        if (latestScore != null)
+        {
+            dynamicListingScore = latestScore.ListingGainScore;
+            dynamicListingRec = latestScore.ListingRecommendation;
+        }
+        else
+        {
+            if (gmpPercent >= 50) { dynamicListingScore = Math.Min(98, 88 + (int)(gmpPercent / 12)); dynamicListingRec = RecommendationRating.Strong; }
+            else if (gmpPercent >= 25) { dynamicListingScore = 78 + (int)((gmpPercent - 25) / 3.0m); dynamicListingRec = RecommendationRating.Strong; }
+            else if (gmpPercent >= 10) { dynamicListingScore = 65 + (int)((gmpPercent - 10) / 1.8m); dynamicListingRec = RecommendationRating.Positive; }
+            else if (gmpPercent >= 2) { dynamicListingScore = 52 + (int)(gmpPercent * 2); dynamicListingRec = RecommendationRating.Neutral; }
+            else { dynamicListingScore = Math.Max(28, 42 - (int)Math.Abs(gmpPercent)); dynamicListingRec = RecommendationRating.Weak; }
+        }
+
+        int dynamicLtScore;
+        RecommendationRating dynamicLtRec;
+        if (latestScore != null)
+        {
+            dynamicLtScore = latestScore.LongTermScore;
+            dynamicLtRec = latestScore.LongTermRecommendation;
+        }
+        else
+        {
+            if (ipo.IpoType == IpoType.Mainboard && ipo.IssueSize > 800) { dynamicLtScore = 82; dynamicLtRec = RecommendationRating.Strong; }
+            else if (ipo.IpoType == IpoType.Sme) { dynamicLtScore = 63; dynamicLtRec = RecommendationRating.Neutral; }
+            else { dynamicLtScore = 68; dynamicLtRec = RecommendationRating.Positive; }
+        }
+
+        // Subscription: only show if open/closed/listed
+        decimal? totalSub = ipo.Status == IpoStatus.Upcoming ? null : latestSub?.TotalSubscription;
+        decimal? qibSub = ipo.Status == IpoStatus.Upcoming ? null : latestSub?.QibSubscription;
+        decimal? retailSub = ipo.Status == IpoStatus.Upcoming ? null : latestSub?.RetailSubscription;
+        decimal? niiSub = ipo.Status == IpoStatus.Upcoming ? null : latestSub?.NiiSubscription;
+
         return new IpoSummaryDto
         {
             Id = ipo.Id,
@@ -487,14 +523,14 @@ public class IpoService : IIpoService
             EstimatedListingPrice = latestGmp != null ? ipo.PriceBandHigh + latestGmp.GMP : ipo.PriceBandHigh,
             GmpTrend = latestGmp != null ? GmpTrend.Increasing : GmpTrend.Stable,
             Gmp24hChange = 0,
-            TotalSubscription = latestSub?.TotalSubscription,
-            QibSubscription = latestSub?.QibSubscription,
-            RetailSubscription = latestSub?.RetailSubscription,
-            NiiSubscription = latestSub?.NiiSubscription,
-            ListingGainScore = latestScore?.ListingGainScore ?? 75,
-            ListingRecommendation = latestScore?.ListingRecommendation ?? RecommendationRating.Positive,
-            LongTermScore = latestScore?.LongTermScore ?? 70,
-            LongTermRecommendation = latestScore?.LongTermRecommendation ?? RecommendationRating.Positive,
+            TotalSubscription = totalSub,
+            QibSubscription = qibSub,
+            RetailSubscription = retailSub,
+            NiiSubscription = niiSub,
+            ListingGainScore = dynamicListingScore,
+            ListingRecommendation = dynamicListingRec,
+            LongTermScore = dynamicLtScore,
+            LongTermRecommendation = dynamicLtRec,
             ValuationClassification = ValuationClassification.Reasonable,
             HighRiskCount = ipo.Risks.Count(r => r.Severity >= RiskSeverity.High),
             CompanyPE = companyPe,

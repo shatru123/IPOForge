@@ -27,28 +27,48 @@ export const IpoCard: React.FC<IpoCardProps> = ({ ipo, onOpenScoreBreakdown }) =
     ? `₹${ipo.issuePrice}`
     : 'TBD';
 
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'TBD';
+    return new Date(dateStr).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+  };
+
   const datesDisplay = () => {
-    if (ipo.status === 'Open' && ipo.closeDate) {
-      const daysLeft = Math.ceil(
-        (new Date(ipo.closeDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-      );
+    if (ipo.status === 'Open') {
+      const daysLeft = ipo.closeDate
+        ? Math.ceil((new Date(ipo.closeDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+        : null;
       return (
         <span className="text-emerald-400 font-semibold">
-          Closes in {daysLeft > 0 ? `${daysLeft}d` : 'Today'}
+          {daysLeft !== null && daysLeft >= 0
+            ? daysLeft === 0
+              ? 'Closes Today'
+              : `Closes in ${daysLeft}d (${formatDate(ipo.closeDate)})`
+            : `Open (${formatDate(ipo.openDate)} - ${formatDate(ipo.closeDate)})`}
         </span>
       );
     }
-    if (ipo.openDate) {
+    if (ipo.status === 'Upcoming') {
       return (
-        <span>
-          {new Date(ipo.openDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} -{' '}
-          {ipo.closeDate
-            ? new Date(ipo.closeDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
-            : 'TBD'}
+        <span className="text-slate-300">
+          Opens {formatDate(ipo.openDate)} • Closes {formatDate(ipo.closeDate)}
         </span>
       );
     }
-    return <span>Dates to be announced</span>;
+    if (ipo.status === 'Closed' || ipo.status === 'AllotmentOut') {
+      return (
+        <span className="text-amber-400/90">
+          Closed {formatDate(ipo.closeDate)} • Listing {formatDate(ipo.listingDate)}
+        </span>
+      );
+    }
+    if (ipo.status === 'Listed') {
+      return (
+        <span className="text-slate-300">
+          Listed on {formatDate(ipo.listingDate || ipo.closeDate)}
+        </span>
+      );
+    }
+    return <span>Dates: {formatDate(ipo.openDate)} - {formatDate(ipo.closeDate)}</span>;
   };
 
   return (
@@ -136,8 +156,14 @@ export const IpoCard: React.FC<IpoCardProps> = ({ ipo, onOpenScoreBreakdown }) =
           </div>
           <div className="bg-slate-800/30 p-2 rounded-lg border border-slate-800/60">
             <span className="text-slate-400 text-[10px] block uppercase font-medium">Subscription</span>
-            <span className="font-mono font-bold text-emerald-400">
-              {ipo.totalSubscription !== undefined ? `${ipo.totalSubscription}x` : 'N/A'}
+            <span className="font-mono font-bold">
+              {ipo.status === 'Upcoming' ? (
+                <span className="text-slate-500 font-normal text-[11px]">Bidding Soon</span>
+              ) : ipo.totalSubscription !== undefined && ipo.totalSubscription !== null && ipo.totalSubscription > 0 ? (
+                <span className="text-emerald-400">{ipo.totalSubscription}x</span>
+              ) : (
+                <span className="text-slate-500 font-normal text-[11px]">—</span>
+              )}
             </span>
           </div>
         </div>

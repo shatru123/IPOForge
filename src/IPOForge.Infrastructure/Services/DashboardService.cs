@@ -52,7 +52,7 @@ public class DashboardService : IDashboardService
 
         // Calculate Market Overview Metrics
         var thisYear = DateTime.UtcNow.Year;
-        var iposThisYear = allIpos.Where(i => i.OpenDate.HasValue && i.OpenDate.Value.Year == thisYear || i.Status == IpoStatus.Listed).ToList();
+        var iposThisYear = allIpos.Where(i => (i.OpenDate.HasValue && i.OpenDate.Value.Year == thisYear) || i.Status == IpoStatus.Listed).ToList();
         var mainboardCount = iposThisYear.Count(i => i.IpoType == IpoType.Mainboard);
         var smeCount = iposThisYear.Count(i => i.IpoType == IpoType.Sme);
 
@@ -64,6 +64,7 @@ public class DashboardService : IDashboardService
         var avgGmp = gmpPercentages.Any() ? Math.Round(gmpPercentages.Average(), 1) : 0;
 
         var subValues = allIpos
+            .Where(i => i.Status != IpoStatus.Upcoming)
             .Select(i => i.SubscriptionHistories.OrderBy(s => s.DayNumber).LastOrDefault())
             .Where(s => s != null)
             .Select(s => s!.TotalSubscription)
@@ -76,14 +77,18 @@ public class DashboardService : IDashboardService
             .ToList();
         var avgGain = listedGains.Any() ? Math.Round(listedGains.Average(), 1) : 0;
 
-        // GMP Movers
-        var movers = _gmpAnalyticsService.GetTopMovers(allIpos, 10);
-        var topGainers = movers.Where(m => m.ChangeAmount >= 0).OrderByDescending(m => m.ChangeAmount).Take(5).ToList();
+        // Trending GMP Gainers: Filter exclusively for Upcoming and Open (Current) IPOs only
+        var activeUpcomingIpos = allIpos
+            .Where(i => i.Status == IpoStatus.Upcoming || i.Status == IpoStatus.Open)
+            .ToList();
+
+        var movers = _gmpAnalyticsService.GetTopMovers(activeUpcomingIpos, 10);
+        var topGainers = movers.OrderByDescending(m => m.CurrentGmpPercentage).Take(6).ToList();
         var topLosers = movers.Where(m => m.ChangeAmount < 0).OrderBy(m => m.ChangeAmount).Take(5).ToList();
 
         // High Potential & High Risk
         var allSummaries = (await _ipoService.GetIposAsync(new IpoFilterRequest { PageSize = 100 }, cancellationToken)).Items;
-        var highPotentialListing = allSummaries.Where(s => (s.ListingGainScore ?? 0) >= 75).OrderByDescending(s => s.ListingGainScore).Take(4).ToList();
+        var highPotentialListing = allSummaries.Where(s => (s.ListingGainScore ?? 0) >= 70).OrderByDescending(s => s.ListingGainScore).Take(4).ToList();
         var highPotentialLongTerm = allSummaries.Where(s => (s.LongTermScore ?? 0) >= 70).OrderByDescending(s => s.LongTermScore).Take(4).ToList();
         var highRisk = allSummaries.Where(s => s.HighRiskCount >= 2 || (s.ListingGainScore ?? 100) < 50).OrderByDescending(s => s.HighRiskCount).Take(4).ToList();
 
@@ -106,7 +111,7 @@ public class DashboardService : IDashboardService
             HighRiskIpos = highRisk
         };
 
-        await _cache.SetAsync(DashboardCacheKey, result, TimeSpan.FromMinutes(5), cancellationToken);
+        await _cache.SetAsync(DashboardCacheKey, result, TimeSpan.FromMinutes(2), cancellationToken);
         return result;
     }
 }
