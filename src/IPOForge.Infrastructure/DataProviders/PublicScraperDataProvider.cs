@@ -84,6 +84,7 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
 
                 if (string.IsNullOrWhiteSpace(rawName) || rawName.Length < 2) continue;
 
+                rawName = System.Net.WebUtility.HtmlDecode(rawName).Replace("\u00a0", " ").Trim();
                 var isSme = isSmeSection || rawName.Contains("SME", StringComparison.OrdinalIgnoreCase);
                 var cleanName = rawName.Replace("SME", "", StringComparison.OrdinalIgnoreCase).Replace("IPO", "", StringComparison.OrdinalIgnoreCase).Trim();
                 if (string.IsNullOrWhiteSpace(cleanName)) cleanName = rawName;

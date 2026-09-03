@@ -393,11 +393,13 @@ public static class DbInitializer
                     Name = "Ather Energy IPO",
                     Symbol = "ATHER",
                     IpoType = IpoType.Mainboard,
-                    Status = IpoStatus.Open,
-                    OpenDate = DateTime.UtcNow.AddDays(-1),
-                    CloseDate = DateTime.UtcNow.AddDays(2),
-                    AllotmentDate = DateTime.UtcNow.AddDays(5),
-                    ListingDate = DateTime.UtcNow.AddDays(8),
+                    Status = IpoStatus.Listed,
+                    OpenDate = new DateTime(2024, 12, 10, 0, 0, 0, DateTimeKind.Utc),
+                    CloseDate = new DateTime(2024, 12, 12, 0, 0, 0, DateTimeKind.Utc),
+                    AllotmentDate = new DateTime(2024, 12, 13, 0, 0, 0, DateTimeKind.Utc),
+                    ListingDate = new DateTime(2024, 12, 17, 0, 0, 0, DateTimeKind.Utc),
+                    ListingPrice = 410m,
+                    ListingGainPercent = 25.00m,
                     PriceBandLow = 310m,
                     PriceBandHigh = 328m,
                     LotSize = 45,
@@ -412,13 +414,12 @@ public static class DbInitializer
                 };
                 atherIpo.GmpHistories = new List<IPOGmpHistory>
                 {
-                    new() { GMP = 65m, GMPPercentage = 19.82m, EstimatedListingPrice = 393m, Source = "Market Aggregator", ObservedAt = DateTime.UtcNow.AddDays(-3), RetrievedAt = DateTime.UtcNow },
-                    new() { GMP = 74m, GMPPercentage = 22.56m, EstimatedListingPrice = 402m, Source = "Market Aggregator", ObservedAt = DateTime.UtcNow.AddDays(-2), RetrievedAt = DateTime.UtcNow },
-                    new() { GMP = 82m, GMPPercentage = 25.00m, EstimatedListingPrice = 410m, Source = "Market Aggregator", ObservedAt = DateTime.UtcNow.AddHours(-6), RetrievedAt = DateTime.UtcNow }
+                    new() { GMP = 65m, GMPPercentage = 19.82m, EstimatedListingPrice = 393m, Source = "Market Aggregator", ObservedAt = new DateTime(2024, 12, 9), RetrievedAt = DateTime.UtcNow },
+                    new() { GMP = 82m, GMPPercentage = 25.00m, EstimatedListingPrice = 410m, Source = "Market Aggregator", ObservedAt = new DateTime(2024, 12, 12), RetrievedAt = DateTime.UtcNow }
                 };
                 atherIpo.SubscriptionHistories = new List<IPOSubscriptionHistory>
                 {
-                    new() { RetailSubscription = 1.25m, QibSubscription = 0.45m, NiiSubscription = 1.82m, TotalSubscription = 1.10m, DayNumber = 1, SnapshotDate = DateTime.UtcNow.AddDays(-1) }
+                    new() { RetailSubscription = 1.25m, QibSubscription = 0.45m, NiiSubscription = 1.82m, TotalSubscription = 1.10m, DayNumber = 1, SnapshotDate = new DateTime(2024, 12, 12) }
                 };
                 atherIpo.Objectives = new List<IPOObjective>
                 {
@@ -434,7 +435,7 @@ public static class DbInitializer
                 };
                 ather.Ipos.Add(atherIpo);
 
-                // 6. NTPC Green Energy Limited (Upcoming IPO)
+                // 6. NTPC Green Energy Limited (Listed IPO)
                 var ntpcGreen = new Company
                 {
                     Name = "NTPC Green Energy Limited",
@@ -463,11 +464,13 @@ public static class DbInitializer
                     Name = "NTPC Green Energy IPO",
                     Symbol = "NTPCGREEN",
                     IpoType = IpoType.Mainboard,
-                    Status = IpoStatus.Upcoming,
-                    OpenDate = DateTime.UtcNow.AddDays(7),
-                    CloseDate = DateTime.UtcNow.AddDays(9),
-                    AllotmentDate = DateTime.UtcNow.AddDays(12),
-                    ListingDate = DateTime.UtcNow.AddDays(15),
+                    Status = IpoStatus.Listed,
+                    OpenDate = new DateTime(2024, 11, 19, 0, 0, 0, DateTimeKind.Utc),
+                    CloseDate = new DateTime(2024, 11, 22, 0, 0, 0, DateTimeKind.Utc),
+                    AllotmentDate = new DateTime(2024, 11, 25, 0, 0, 0, DateTimeKind.Utc),
+                    ListingDate = new DateTime(2024, 11, 27, 0, 0, 0, DateTimeKind.Utc),
+                    ListingPrice = 111.5m,
+                    ListingGainPercent = 3.24m,
                     PriceBandLow = 102m,
                     PriceBandHigh = 108m,
                     LotSize = 138,
@@ -482,8 +485,12 @@ public static class DbInitializer
                 };
                 ntpcGreenIpo.GmpHistories = new List<IPOGmpHistory>
                 {
-                    new() { GMP = 18m, GMPPercentage = 16.67m, EstimatedListingPrice = 126m, Source = "Market Aggregator", ObservedAt = DateTime.UtcNow.AddDays(-2), RetrievedAt = DateTime.UtcNow },
-                    new() { GMP = 22m, GMPPercentage = 20.37m, EstimatedListingPrice = 130m, Source = "Market Aggregator", ObservedAt = DateTime.UtcNow.AddDays(-1), RetrievedAt = DateTime.UtcNow }
+                    new() { GMP = 18m, GMPPercentage = 16.67m, EstimatedListingPrice = 126m, Source = "Market Aggregator", ObservedAt = new DateTime(2024, 11, 20), RetrievedAt = DateTime.UtcNow },
+                    new() { GMP = 3.5m, GMPPercentage = 3.24m, EstimatedListingPrice = 111.5m, Source = "Market Aggregator", ObservedAt = new DateTime(2024, 11, 22), RetrievedAt = DateTime.UtcNow }
+                };
+                ntpcGreenIpo.SubscriptionHistories = new List<IPOSubscriptionHistory>
+                {
+                    new() { RetailSubscription = 1.33m, QibSubscription = 3.32m, NiiSubscription = 0.81m, TotalSubscription = 2.42m, DayNumber = 3, SnapshotDate = new DateTime(2024, 11, 22) }
                 };
                 ntpcGreenIpo.Objectives = new List<IPOObjective>
                 {
@@ -497,7 +504,7 @@ public static class DbInitializer
                 };
                 ntpcGreen.Ipos.Add(ntpcGreenIpo);
 
-                // 7. Apex Solar & Automation (SME Open IPO)
+                // 7. Apex Solar & Automation (SME Listed IPO)
                 var apexSolar = new Company
                 {
                     Name = "Apex Solar Automation Limited",
@@ -527,11 +534,13 @@ public static class DbInitializer
                     Name = "Apex Solar Automation SME IPO",
                     Symbol = "APEXSOLAR",
                     IpoType = IpoType.Sme,
-                    Status = IpoStatus.Open,
-                    OpenDate = DateTime.UtcNow.AddDays(-1),
-                    CloseDate = DateTime.UtcNow.AddDays(2),
-                    AllotmentDate = DateTime.UtcNow.AddDays(5),
-                    ListingDate = DateTime.UtcNow.AddDays(8),
+                    Status = IpoStatus.Listed,
+                    OpenDate = new DateTime(2024, 6, 24, 0, 0, 0, DateTimeKind.Utc),
+                    CloseDate = new DateTime(2024, 6, 26, 0, 0, 0, DateTimeKind.Utc),
+                    AllotmentDate = new DateTime(2024, 6, 27, 0, 0, 0, DateTimeKind.Utc),
+                    ListingDate = new DateTime(2024, 7, 1, 0, 0, 0, DateTimeKind.Utc),
+                    ListingPrice = 184m,
+                    ListingGainPercent = 50.82m,
                     PriceBandLow = 115m,
                     PriceBandHigh = 122m,
                     LotSize = 1000,
@@ -546,12 +555,12 @@ public static class DbInitializer
                 };
                 apexSolarIpo.GmpHistories = new List<IPOGmpHistory>
                 {
-                    new() { GMP = 55m, GMPPercentage = 45.08m, EstimatedListingPrice = 177m, Source = "Market Aggregator", ObservedAt = DateTime.UtcNow.AddDays(-2), RetrievedAt = DateTime.UtcNow },
-                    new() { GMP = 62m, GMPPercentage = 50.82m, EstimatedListingPrice = 184m, Source = "Market Aggregator", ObservedAt = DateTime.UtcNow.AddHours(-12), RetrievedAt = DateTime.UtcNow }
+                    new() { GMP = 55m, GMPPercentage = 45.08m, EstimatedListingPrice = 177m, Source = "Market Aggregator", ObservedAt = new DateTime(2024, 6, 24), RetrievedAt = DateTime.UtcNow },
+                    new() { GMP = 62m, GMPPercentage = 50.82m, EstimatedListingPrice = 184m, Source = "Market Aggregator", ObservedAt = new DateTime(2024, 6, 26), RetrievedAt = DateTime.UtcNow }
                 };
                 apexSolarIpo.SubscriptionHistories = new List<IPOSubscriptionHistory>
                 {
-                    new() { RetailSubscription = 14.5m, QibSubscription = 3.2m, NiiSubscription = 28.0m, TotalSubscription = 18.2m, DayNumber = 1, SnapshotDate = DateTime.UtcNow.AddDays(-1) }
+                    new() { RetailSubscription = 14.5m, QibSubscription = 3.2m, NiiSubscription = 28.0m, TotalSubscription = 18.2m, DayNumber = 3, SnapshotDate = new DateTime(2024, 6, 26) }
                 };
                 apexSolarIpo.Objectives = new List<IPOObjective>
                 {
