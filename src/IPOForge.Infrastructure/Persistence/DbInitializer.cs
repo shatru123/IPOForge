@@ -27,19 +27,29 @@ public static class DbInitializer
             await context.Database.EnsureCreatedAsync();
 
             // 1. Seed Industry Benchmark Metrics if empty
-            if (!await context.IndustryMetrics.AnyAsync())
+            // 1. Seed or synchronize Industry Benchmark Metrics
+            var standardIndustryMetrics = new List<IndustryMetric>
             {
-                var industryMetrics = new List<IndustryMetric>
-                {
-                    new() { Sector = "Technology", Industry = "Automotive Engineering & IT", MedianPE = 42.5m, MedianPB = 8.2m, MedianROE = 21.4m, MedianROCE = 26.8m, MedianDebtEquity = 0.15m, MedianNetMargin = 16.5m },
-                    new() { Sector = "Energy & Utilities", Industry = "Solar & Renewable Equipment", MedianPE = 38.0m, MedianPB = 5.5m, MedianROE = 19.5m, MedianROCE = 22.0m, MedianDebtEquity = 0.65m, MedianNetMargin = 14.2m },
-                    new() { Sector = "Financial Services", Industry = "Housing Finance & NBFC", MedianPE = 24.0m, MedianPB = 3.2m, MedianROE = 16.8m, MedianROCE = 14.5m, MedianDebtEquity = 3.80m, MedianNetMargin = 22.0m },
-                    new() { Sector = "Consumer Discretionary", Industry = "Quick Commerce & Delivery", MedianPE = 65.0m, MedianPB = 6.8m, MedianROE = 8.5m, MedianROCE = 9.2m, MedianDebtEquity = 0.25m, MedianNetMargin = 3.5m },
-                    new() { Sector = "Automobile", Industry = "Electric Two-Wheelers", MedianPE = 48.0m, MedianPB = 5.8m, MedianROE = 12.0m, MedianROCE = 14.0m, MedianDebtEquity = 0.45m, MedianNetMargin = 6.8m },
-                    new() { Sector = "Consumer Staples", Industry = "D2C Beauty & Personal Care", MedianPE = 52.0m, MedianPB = 7.1m, MedianROE = 14.5m, MedianROCE = 16.2m, MedianDebtEquity = 0.18m, MedianNetMargin = 8.4m },
-                    new() { Sector = "Capital Goods & Automation", Industry = "Industrial Automation & Robotics", MedianPE = 36.5m, MedianPB = 4.8m, MedianROE = 18.2m, MedianROCE = 21.0m, MedianDebtEquity = 0.35m, MedianNetMargin = 12.8m }
-                };
-                await context.IndustryMetrics.AddRangeAsync(industryMetrics);
+                new() { Sector = "Technology", Industry = "Cloud Infrastructure, Software & IT", MedianPE = 42.5m, MedianPB = 8.2m, MedianROE = 21.4m, MedianROCE = 26.8m, MedianDebtEquity = 0.15m, MedianNetMargin = 16.5m },
+                new() { Sector = "Healthcare & Pharma", Industry = "Pharmaceuticals & Healthcare Services", MedianPE = 34.0m, MedianPB = 5.2m, MedianROE = 17.5m, MedianROCE = 21.0m, MedianDebtEquity = 0.30m, MedianNetMargin = 13.5m },
+                new() { Sector = "Financial Services", Industry = "Housing Finance, Exchanges & NBFC", MedianPE = 24.0m, MedianPB = 3.2m, MedianROE = 16.8m, MedianROCE = 14.5m, MedianDebtEquity = 3.80m, MedianNetMargin = 22.0m },
+                new() { Sector = "Energy & Utilities", Industry = "Solar, Renewable Energy & Power", MedianPE = 38.0m, MedianPB = 5.5m, MedianROE = 19.5m, MedianROCE = 22.0m, MedianDebtEquity = 0.65m, MedianNetMargin = 14.2m },
+                new() { Sector = "Automobile", Industry = "Electric Vehicles & Auto Components", MedianPE = 48.0m, MedianPB = 5.8m, MedianROE = 12.0m, MedianROCE = 14.0m, MedianDebtEquity = 0.45m, MedianNetMargin = 6.8m },
+                new() { Sector = "Consumer Discretionary", Industry = "Media, Entertainment & Quick Commerce", MedianPE = 45.0m, MedianPB = 6.2m, MedianROE = 12.5m, MedianROCE = 14.2m, MedianDebtEquity = 0.35m, MedianNetMargin = 6.5m },
+                new() { Sector = "Consumer Staples", Industry = "Consumer Goods, Food & Retail", MedianPE = 52.0m, MedianPB = 7.1m, MedianROE = 18.5m, MedianROCE = 20.2m, MedianDebtEquity = 0.18m, MedianNetMargin = 8.4m },
+                new() { Sector = "Capital Goods & Automation", Industry = "Industrial Machinery & Automation", MedianPE = 36.5m, MedianPB = 4.8m, MedianROE = 18.2m, MedianROCE = 21.0m, MedianDebtEquity = 0.35m, MedianNetMargin = 12.8m },
+                new() { Sector = "Specialty Chemicals", Industry = "Specialty & Industrial Chemicals", MedianPE = 28.5m, MedianPB = 4.1m, MedianROE = 16.0m, MedianROCE = 19.0m, MedianDebtEquity = 0.40m, MedianNetMargin = 11.5m },
+                new() { Sector = "Infrastructure & Real Estate", Industry = "Real Estate Development & Infrastructure", MedianPE = 22.0m, MedianPB = 2.8m, MedianROE = 13.5m, MedianROCE = 15.0m, MedianDebtEquity = 0.85m, MedianNetMargin = 10.0m },
+                new() { Sector = "Logistics & Supply Chain", Industry = "Supply Chain & Express Logistics", MedianPE = 32.0m, MedianPB = 4.0m, MedianROE = 14.0m, MedianROCE = 16.5m, MedianDebtEquity = 0.45m, MedianNetMargin = 7.2m },
+                new() { Sector = "Jewellery & Gems", Industry = "Gems, Jewellery & Precious Metals", MedianPE = 35.0m, MedianPB = 6.2m, MedianROE = 20.0m, MedianROCE = 22.5m, MedianDebtEquity = 0.55m, MedianNetMargin = 7.0m },
+                new() { Sector = "Diversified Industrials", Industry = "Industrial Manufacturing & Services", MedianPE = 30.0m, MedianPB = 3.5m, MedianROE = 15.0m, MedianROCE = 17.5m, MedianDebtEquity = 0.50m, MedianNetMargin = 8.5m }
+            };
+
+            var existingSectors = await context.IndustryMetrics.Select(m => m.Sector).ToListAsync();
+            var missingMetrics = standardIndustryMetrics.Where(m => !existingSectors.Contains(m.Sector)).ToList();
+            if (missingMetrics.Any())
+            {
+                await context.IndustryMetrics.AddRangeAsync(missingMetrics);
                 await context.SaveChangesAsync();
             }
 

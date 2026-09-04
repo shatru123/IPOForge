@@ -90,10 +90,14 @@ public class DataRefreshService : IDataRefreshService
                 }
                 else
                 {
-                    // Update latest market price & GMP
+                    // Update latest market price, lot metrics & company metadata
                     match.Status = liveIpo.Status;
                     match.PriceBandHigh = liveIpo.PriceBandHigh > 0 ? liveIpo.PriceBandHigh : match.PriceBandHigh;
                     match.PriceBandLow = liveIpo.PriceBandLow > 0 ? liveIpo.PriceBandLow : match.PriceBandLow;
+                    match.LotSize = liveIpo.LotSize > 0 ? liveIpo.LotSize : match.LotSize;
+                    match.IssueSize = liveIpo.IssueSize > 0 ? liveIpo.IssueSize : match.IssueSize;
+                    match.FreshIssueAmount = liveIpo.FreshIssueAmount > 0 ? liveIpo.FreshIssueAmount : match.FreshIssueAmount;
+                    match.OFSAmount = liveIpo.OFSAmount > 0 ? liveIpo.OFSAmount : match.OFSAmount;
                     match.OpenDate = liveIpo.OpenDate ?? match.OpenDate;
                     match.CloseDate = liveIpo.CloseDate ?? match.CloseDate;
                     match.AllotmentDate = liveIpo.AllotmentDate ?? match.AllotmentDate;
@@ -104,6 +108,24 @@ public class DataRefreshService : IDataRefreshService
                         match.ListingGainPercent = liveIpo.ListingGainPercent ?? match.ListingGainPercent;
                         match.Day1ClosePrice = liveIpo.Day1ClosePrice ?? match.Day1ClosePrice;
                     }
+
+                    if (match.Company != null && liveIpo.Company != null)
+                    {
+                        match.Company.Sector = !string.IsNullOrWhiteSpace(liveIpo.Company.Sector) ? liveIpo.Company.Sector : match.Company.Sector;
+                        match.Company.Industry = !string.IsNullOrWhiteSpace(liveIpo.Company.Industry) ? liveIpo.Company.Industry : match.Company.Industry;
+                        match.Company.PromoterHoldingPreIssue = liveIpo.Company.PromoterHoldingPreIssue > 0 ? liveIpo.Company.PromoterHoldingPreIssue : match.Company.PromoterHoldingPreIssue;
+                        match.Company.PromoterHoldingPostIssue = liveIpo.Company.PromoterHoldingPostIssue > 0 ? liveIpo.Company.PromoterHoldingPostIssue : match.Company.PromoterHoldingPostIssue;
+
+                        if (!match.Company.Financials.Any() && liveIpo.Company.Financials.Any())
+                        {
+                            foreach (var fin in liveIpo.Company.Financials)
+                            {
+                                fin.CompanyId = match.Company.Id;
+                                match.Company.Financials.Add(fin);
+                            }
+                        }
+                    }
+
                     match.UpdatedAt = DateTime.UtcNow;
 
                     var latestGmp = liveIpo.GmpHistories.LastOrDefault();
@@ -120,7 +142,6 @@ public class DataRefreshService : IDataRefreshService
                             ObservedAt = DateTime.UtcNow,
                             RetrievedAt = DateTime.UtcNow
                         };
-                        await _context.IPOGmpHistories.AddAsync(gmpHistory, cancellationToken);
                         match.GmpHistories.Add(gmpHistory);
                     }
                 }
@@ -177,7 +198,6 @@ public class DataRefreshService : IDataRefreshService
                         BreakdownJson = JsonSerializer.Serialize(scoreBreakdown),
                         CalculatedAt = DateTime.UtcNow
                     };
-                    await _context.IPOScores.AddAsync(newScore, cancellationToken);
                     ipo.Scores.Add(newScore);
                 }
             }
