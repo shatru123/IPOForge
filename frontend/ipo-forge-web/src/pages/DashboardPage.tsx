@@ -224,26 +224,33 @@ export const DashboardPage: React.FC = () => {
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-            {summary.topGmpGainers.slice(0, 4).map((mover) => (
-              <Link
-                key={mover.ipoId}
-                to={`/ipos/${mover.ipoId}`}
-                className="p-3 bg-slate-950/60 hover:bg-slate-800/60 border border-slate-800/80 rounded-xl flex items-center justify-between transition group"
-              >
-                <div>
-                  <span className="text-xs font-bold text-white group-hover:text-emerald-400 transition block truncate max-w-[130px]">
-                    {mover.ipoName}
-                  </span>
-                  <span className="text-[10px] text-slate-500">{mover.ipoType}</span>
-                </div>
-                <div className="text-right font-mono">
-                  <span className="text-xs font-bold text-emerald-400 block">
-                    +₹{mover.currentGmp}
-                  </span>
-                  <span className="text-[10px] text-emerald-500">+{mover.currentGmpPercentage}%</span>
-                </div>
-              </Link>
-            ))}
+            {summary.topGmpGainers.slice(0, 4).map((mover) => {
+              const matchingIpo = allIpos.find((i) => i.id === mover.ipoId);
+              const lot = matchingIpo?.lotSize;
+              const estProfit = lot ? mover.currentGmp * lot : null;
+              return (
+                <Link
+                  key={mover.ipoId}
+                  to={`/ipos/${mover.ipoId}`}
+                  className="p-3 bg-slate-950/60 hover:bg-slate-800/60 border border-slate-800/80 rounded-xl flex items-center justify-between transition group"
+                >
+                  <div>
+                    <span className="text-xs font-bold text-white group-hover:text-emerald-400 transition block truncate max-w-[130px]">
+                      {mover.ipoName}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {mover.ipoType} {estProfit ? `• Est: ₹${estProfit.toLocaleString('en-IN')}/lot` : ''}
+                    </span>
+                  </div>
+                  <div className="text-right font-mono">
+                    <span className="text-xs font-bold text-emerald-400 block">
+                      +₹{mover.currentGmp}
+                    </span>
+                    <span className="text-[10px] text-emerald-500 font-semibold">+{mover.currentGmpPercentage}%</span>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}
@@ -322,7 +329,9 @@ export const DashboardPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {recentlyListedIpos.map((ipo) => {
               const listGain = ipo.actualListingGainPercent ?? ipo.listingGainPercent;
+              const listGainPerLot = ipo.actualListingGainPerLot ?? (ipo.priceBandHigh && ipo.listingPrice && ipo.lotSize ? (ipo.listingPrice - ipo.priceBandHigh) * ipo.lotSize : null);
               const listPrice = ipo.actualListingPrice ?? ipo.listingPrice;
+              const issuePrice = ipo.priceBandHigh || ipo.issuePrice;
               return (
                 <Link
                   key={ipo.id}
@@ -331,25 +340,33 @@ export const DashboardPage: React.FC = () => {
                 >
                   <div>
                     <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
-                      <span>{ipo.ipoType}</span>
-                      <span>{ipo.listingDate ? new Date(ipo.listingDate).toLocaleDateString('en-IN') : '-'}</span>
+                      <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">{ipo.ipoType}</span>
+                      <span className="font-mono text-[10px] text-slate-400">Listed: {ipo.listingDate ? new Date(ipo.listingDate).toLocaleDateString('en-IN') : '-'}</span>
                     </div>
                     <h4 className="font-bold text-white text-sm group-hover:text-emerald-400 transition truncate">
                       {ipo.name}
                     </h4>
-                    <p className="text-xs text-slate-400">{ipo.sector}</p>
+                    <div className="text-xs text-slate-400 mt-0.5 flex items-center justify-between">
+                      <span>{ipo.sector}</span>
+                      <span className="text-slate-500 font-mono text-[10px]">Issue: ₹{issuePrice || '-'}</span>
+                    </div>
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase block">Listing Gain</span>
+                      <span className="text-[10px] text-emerald-400 font-semibold uppercase block">Exact Listing Gain</span>
                       <span className="font-mono font-bold text-emerald-400 text-sm">
                         {listGain !== undefined ? `+${listGain}%` : '-'}
                       </span>
+                      {listGainPerLot && (
+                        <span className="text-[10px] text-emerald-500 block font-mono">
+                          +₹{listGainPerLot.toLocaleString('en-IN')}/lot
+                        </span>
+                      )}
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] text-slate-500 uppercase block">Listed Price</span>
-                      <span className="font-mono font-bold text-slate-100 text-sm">
+                      <span className="text-[10px] text-slate-400 uppercase block">Debut Price</span>
+                      <span className="font-mono font-bold text-white text-sm">
                         {listPrice ? `₹${listPrice}` : '-'}
                       </span>
                     </div>

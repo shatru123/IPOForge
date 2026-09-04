@@ -198,6 +198,12 @@ public class IpoService : IIpoService
             LatestGmp = summary.LatestGmp,
             LatestGmpPercentage = summary.LatestGmpPercentage,
             EstimatedListingPrice = summary.EstimatedListingPrice,
+            EstimatedProfitPerLot = summary.EstimatedProfitPerLot,
+            ListingPrice = summary.ListingPrice,
+            ListingGainPercent = summary.ListingGainPercent,
+            ActualListingGainAmount = summary.ActualListingGainAmount,
+            ActualListingGainPerLot = summary.ActualListingGainPerLot,
+            Day1ClosePrice = summary.Day1ClosePrice,
             GmpTrend = summary.GmpTrend,
             Gmp24hChange = summary.Gmp24hChange,
             TotalSubscription = summary.TotalSubscription,
@@ -227,10 +233,7 @@ public class IpoService : IIpoService
             FaceValue = ipo.FaceValue,
             Registrar = ipo.Registrar,
             LeadManagers = ipo.LeadManagers,
-            Exchange = ipo.Exchange,
-            ActualListingPrice = ipo.ListingPrice,
-            ActualListingGainPercent = ipo.ListingGainPercent,
-            Day1ClosePrice = ipo.Day1ClosePrice
+            Exchange = ipo.Exchange
         };
     }
 
@@ -519,6 +522,30 @@ public class IpoService : IIpoService
         decimal? retailSub = status == IpoStatus.Upcoming ? null : latestSub?.RetailSubscription;
         decimal? niiSub = status == IpoStatus.Upcoming ? null : latestSub?.NiiSubscription;
 
+        // Estimated Profit / Loss based on current GMP
+        decimal? estimatedProfitPerLot = null;
+        if (latestGmp != null && ipo.LotSize > 0)
+        {
+            estimatedProfitPerLot = latestGmp.GMP * ipo.LotSize;
+        }
+
+        // Actual Listing Day Metrics (for Listed IPOs)
+        decimal? listingPrice = ipo.ListingPrice;
+        decimal? listingGainPercent = ipo.ListingGainPercent;
+        decimal? actualGainAmount = null;
+        decimal? actualGainPerLot = null;
+
+        if (status == IpoStatus.Listed)
+        {
+            listingPrice ??= (latestGmp != null && latestGmp.EstimatedListingPrice > 0 ? latestGmp.EstimatedListingPrice : (latestGmp != null ? ipo.PriceBandHigh + latestGmp.GMP : ipo.PriceBandHigh));
+            if (listingPrice.HasValue && ipo.PriceBandHigh > 0)
+            {
+                actualGainAmount = listingPrice.Value - ipo.PriceBandHigh;
+                actualGainPerLot = ipo.LotSize > 0 ? actualGainAmount.Value * ipo.LotSize : null;
+                listingGainPercent ??= Math.Round((actualGainAmount.Value / ipo.PriceBandHigh) * 100m, 2);
+            }
+        }
+
         return new IpoSummaryDto
         {
             Id = ipo.Id,
@@ -543,6 +570,12 @@ public class IpoService : IIpoService
             LatestGmp = latestGmp?.GMP,
             LatestGmpPercentage = gmpPercent,
             EstimatedListingPrice = latestGmp != null ? ipo.PriceBandHigh + latestGmp.GMP : ipo.PriceBandHigh,
+            EstimatedProfitPerLot = estimatedProfitPerLot,
+            ListingPrice = listingPrice,
+            ListingGainPercent = listingGainPercent,
+            ActualListingGainAmount = actualGainAmount,
+            ActualListingGainPerLot = actualGainPerLot,
+            Day1ClosePrice = ipo.Day1ClosePrice ?? listingPrice,
             GmpTrend = latestGmp != null ? GmpTrend.Increasing : GmpTrend.Stable,
             Gmp24hChange = 0,
             TotalSubscription = totalSub,

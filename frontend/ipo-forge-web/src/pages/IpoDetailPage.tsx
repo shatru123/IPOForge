@@ -27,6 +27,12 @@ import {
   Info,
   Share2,
   Download,
+  Calculator,
+  Award,
+  DollarSign,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { shareToWhatsApp, generateComparisonImage } from '../utils/imageExporter';
 
@@ -38,6 +44,7 @@ export const IpoDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
+  const [calcLots, setCalcLots] = useState(1);
   const [activeTab, setActiveTab] = useState<
     'gmp' | 'subscription' | 'financials' | 'valuation' | 'funds' | 'risks' | 'company'
   >('gmp');
@@ -335,6 +342,265 @@ export const IpoDetailPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Dynamic Status Intelligence Banner */}
+      {ipo.status === 'Listed' ? (
+        <div className="bg-gradient-to-r from-emerald-950/70 via-slate-900 to-teal-950/70 border-2 border-emerald-500/40 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <Award className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                  Official Listing Day Outcome & Performance
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                    Live Verified
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Exact exchange debut price, lot return, and post-listing performance
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-slate-400">Listed on:</span>
+              <span className="text-xs font-bold text-slate-200 bg-slate-950/70 px-3 py-1 rounded-lg border border-slate-800">
+                {ipo.listingDate ? new Date(ipo.listingDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Listed'}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2">
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Issue Price</span>
+              <span className="font-mono font-bold text-white text-base">₹{ipo.priceBandHigh || ipo.issuePrice || '-'}</span>
+              <span className="text-[10px] text-slate-500 block">Cutoff Band</span>
+            </div>
+
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-emerald-500/30">
+              <span className="text-[10px] text-emerald-400 uppercase font-semibold block">Debut / Listing Price</span>
+              <span className="font-mono font-extrabold text-emerald-300 text-lg">₹{ipo.listingPrice || '-'}</span>
+              <span className="text-[10px] text-emerald-400 font-semibold block">
+                {ipo.listingGainPercent !== undefined ? `${ipo.listingGainPercent >= 0 ? '+' : ''}${ipo.listingGainPercent.toFixed(1)}%` : 'Recorded'}
+              </span>
+            </div>
+
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-emerald-500/30">
+              <span className="text-[10px] text-emerald-400 uppercase font-semibold block">Listing Gain / Share</span>
+              <span className="font-mono font-extrabold text-emerald-300 text-base">
+                {ipo.actualListingGainAmount !== undefined
+                  ? `${ipo.actualListingGainAmount >= 0 ? '+' : ''}₹${ipo.actualListingGainAmount.toLocaleString('en-IN')}`
+                  : ipo.listingPrice && ipo.priceBandHigh
+                  ? `${ipo.listingPrice >= ipo.priceBandHigh ? '+' : ''}₹${(ipo.listingPrice - ipo.priceBandHigh).toLocaleString('en-IN')}`
+                  : '-'}
+              </span>
+              <span className="text-[10px] text-slate-400 block">Per share gain</span>
+            </div>
+
+            <div className="bg-emerald-950/60 p-3.5 rounded-xl border border-emerald-500/50 shadow-inner">
+              <span className="text-[10px] text-emerald-300 uppercase font-bold block">Exact Profit / Lot</span>
+              <span className="font-mono font-black text-emerald-200 text-lg">
+                {ipo.actualListingGainPerLot !== undefined
+                  ? `${ipo.actualListingGainPerLot >= 0 ? '+' : ''}₹${ipo.actualListingGainPerLot.toLocaleString('en-IN')}`
+                  : ipo.actualListingGainAmount && ipo.lotSize
+                  ? `${ipo.actualListingGainAmount >= 0 ? '+' : ''}₹${(ipo.actualListingGainAmount * ipo.lotSize).toLocaleString('en-IN')}`
+                  : '-'}
+              </span>
+              <span className="text-[10px] text-emerald-400/80 block font-medium">1 Lot ({ipo.lotSize || '-'} sh)</span>
+            </div>
+
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Day 1 Close Price</span>
+              <span className="font-mono font-bold text-white text-base">
+                ₹{ipo.day1ClosePrice || ipo.listingPrice || '-'}
+              </span>
+              <span className="text-[10px] text-slate-500 block">NSE/BSE Close</span>
+            </div>
+
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Registrar Allotment</span>
+              <span className="font-semibold text-slate-200 text-xs truncate block mt-1" title={ipo.registrar || 'Link Intime / KFintech'}>
+                {ipo.registrar || 'Link Intime / KFintech'}
+              </span>
+              <span className="text-[10px] text-emerald-400 block font-medium">Allotment Finalized</span>
+            </div>
+          </div>
+        </div>
+      ) : ipo.status === 'Closed' ? (
+        <div className="bg-gradient-to-r from-amber-950/60 via-slate-900 to-indigo-950/60 border-2 border-amber-500/40 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                  Bidding Concluded • Awaiting Allotment & Listing
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    Closed
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Issue closed for public bidding on {ipo.closeDate ? new Date(ipo.closeDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'recently'}. Track allotment and expected listing gains.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-slate-400">Allotment Date:</span>
+              <span className="text-xs font-bold text-amber-300 bg-amber-950/60 px-3 py-1 rounded-lg border border-amber-500/40">
+                {ipo.allotmentDate ? new Date(ipo.allotmentDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2">
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Cutoff Price</span>
+              <span className="font-mono font-bold text-white text-base">₹{ipo.priceBandHigh || ipo.issuePrice || '-'}</span>
+              <span className="text-[10px] text-slate-500 block">Lot: {ipo.lotSize || '-'} shares</span>
+            </div>
+
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-emerald-500/30">
+              <span className="text-[10px] text-emerald-400 uppercase font-semibold block">Latest GMP</span>
+              <span className="font-mono font-extrabold text-emerald-300 text-lg">
+                {gmpVal !== undefined ? `+₹${gmpVal}` : '₹0'}
+              </span>
+              <span className="text-[10px] text-emerald-400 font-semibold block">
+                {gmpPct !== undefined ? `+${gmpPct.toFixed(1)}%` : '0%'}
+              </span>
+            </div>
+
+            <div className="bg-emerald-950/60 p-3.5 rounded-xl border border-emerald-500/50 shadow-inner">
+              <span className="text-[10px] text-emerald-300 uppercase font-bold block">Est. Profit / Lot</span>
+              <span className="font-mono font-black text-emerald-200 text-lg">
+                {gmpVal && ipo.lotSize
+                  ? `+₹${(gmpVal * ipo.lotSize).toLocaleString('en-IN')}`
+                  : '₹0'}
+              </span>
+              <span className="text-[10px] text-emerald-400/80 block font-medium">1 Lot ({ipo.lotSize || '-'} sh)</span>
+            </div>
+
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Expected Listing Price</span>
+              <span className="font-mono font-bold text-emerald-300 text-base">
+                ₹{estListing || '-'}
+              </span>
+              <span className="text-[10px] text-slate-500 block">Issue + Current GMP</span>
+            </div>
+
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Total Subscription</span>
+              <span className="font-mono font-bold text-white text-base">
+                {ipo.subscription?.latestTotalSubscription ?? ipo.totalSubscription ?? 0}x
+              </span>
+              <span className="text-[10px] text-slate-500 block">
+                QIB: {ipo.subscription?.latestQibSubscription ?? ipo.qibSubscription ?? 0}x
+              </span>
+            </div>
+
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Listing On Exchange</span>
+              <span className="font-bold text-emerald-400 text-xs truncate block mt-1">
+                {ipo.listingDate ? new Date(ipo.listingDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}
+              </span>
+              <span className="text-[10px] text-slate-500 block">{ipo.exchange || 'BSE/NSE'}</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border-2 border-emerald-500/30 rounded-3xl p-6 sm:p-7 shadow-2xl space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                  {ipo.status === 'Open' ? 'Live Issue • Open for Bidding' : 'Upcoming Issue Intelligence'}
+                  <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${
+                    ipo.status === 'Open'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      : 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                  }`}>
+                    {ipo.status}
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400">
+                  {ipo.status === 'Open'
+                    ? `Bidding is live! Closes on ${ipo.closeDate ? new Date(ipo.closeDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}`
+                    : `Expected to open on ${ipo.openDate ? new Date(ipo.openDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-slate-400">Min Investment:</span>
+              <span className="text-xs font-bold text-emerald-300 bg-slate-950/70 px-3 py-1 rounded-lg border border-slate-800">
+                ₹{ipo.minimumInvestment?.toLocaleString('en-IN') || (ipo.priceBandHigh && ipo.lotSize ? (ipo.priceBandHigh * ipo.lotSize).toLocaleString('en-IN') : '-')}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2">
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Price Band</span>
+              <span className="font-mono font-bold text-white text-base">{priceRange}</span>
+              <span className="text-[10px] text-slate-500 block">Lot: {ipo.lotSize || '-'} shares</span>
+            </div>
+
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-emerald-500/30">
+              <span className="text-[10px] text-emerald-400 uppercase font-semibold block">Current GMP</span>
+              <span className="font-mono font-extrabold text-emerald-300 text-lg">
+                {gmpVal !== undefined ? `+₹${gmpVal}` : '₹0'}
+              </span>
+              <span className="text-[10px] text-emerald-400 font-semibold block">
+                {gmpPct !== undefined ? `+${gmpPct.toFixed(1)}%` : '0%'}
+              </span>
+            </div>
+
+            <div className="bg-emerald-950/60 p-3.5 rounded-xl border border-emerald-500/50 shadow-inner">
+              <span className="text-[10px] text-emerald-300 uppercase font-bold block">Est. Profit / Lot</span>
+              <span className="font-mono font-black text-emerald-200 text-lg">
+                {gmpVal && ipo.lotSize
+                  ? `+₹${(gmpVal * ipo.lotSize).toLocaleString('en-IN')}`
+                  : '₹0'}
+              </span>
+              <span className="text-[10px] text-emerald-400/80 block font-medium">1 Lot ({ipo.lotSize || '-'} sh)</span>
+            </div>
+
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Estimated Listing Price</span>
+              <span className="font-mono font-bold text-emerald-300 text-base">
+                ₹{estListing || '-'}
+              </span>
+              <span className="text-[10px] text-slate-500 block">Issue + Current GMP</span>
+            </div>
+
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Total Demand</span>
+              <span className="font-mono font-bold text-white text-base">
+                {ipo.subscription?.latestTotalSubscription ?? ipo.totalSubscription ?? 0}x
+              </span>
+              <span className="text-[10px] text-slate-500 block">
+                QIB: {ipo.subscription?.latestQibSubscription ?? ipo.qibSubscription ?? 0}x
+              </span>
+            </div>
+
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Issue Closes</span>
+              <span className="font-bold text-white text-xs truncate block mt-1">
+                {ipo.closeDate ? new Date(ipo.closeDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}
+              </span>
+              <span className="text-[10px] text-emerald-400 block font-medium">
+                Listing: {ipo.listingDate ? new Date(ipo.listingDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }) : 'TBD'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Interactive Tabs Navigation */}
       <div className="flex border-b border-slate-800 bg-slate-900/60 p-1 rounded-2xl overflow-x-auto space-x-1">
         {[
@@ -369,65 +635,216 @@ export const IpoDetailPage: React.FC = () => {
       <div className="space-y-6">
         {/* Tab 1: GMP */}
         {activeTab === 'gmp' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-8 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-white">Grey Market Premium (GMP) Trend</h3>
-                  <p className="text-xs text-slate-400">Real-time unofficial dealer aggregate movement</p>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-8 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-white">Grey Market Premium (GMP) Trend</h3>
+                    <p className="text-xs text-slate-400">Real-time unofficial dealer aggregate movement</p>
+                  </div>
+                  <GmpBadge
+                    gmp={gmpVal}
+                    percentage={gmpPct}
+                    trend={gmpTrend}
+                  />
                 </div>
-                <GmpBadge
-                  gmp={gmpVal}
-                  percentage={gmpPct}
-                  trend={gmpTrend}
+
+                <GmpTrendChart
+                  snapshots={ipo.gmpHistory?.snapshots || [
+                    { id: '1', gmp: gmpVal || 50, gmpPercentage: gmpPct || 25, estimatedListingPrice: estListing || 250, source: 'Dealer Consensus', observedAt: new Date().toISOString() }
+                  ]}
+                  issuePrice={ipo.priceBandHigh || ipo.issuePrice}
                 />
               </div>
 
-              <GmpTrendChart
-                snapshots={ipo.gmpHistory?.snapshots || [
-                  { id: '1', gmp: gmpVal || 50, gmpPercentage: gmpPct || 25, estimatedListingPrice: estListing || 250, source: 'Dealer Consensus', observedAt: new Date().toISOString() }
-                ]}
-                issuePrice={ipo.priceBandHigh || ipo.issuePrice}
-              />
+              <div className="lg:col-span-4 space-y-4">
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    GMP Momentum & Deltas
+                  </h4>
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs font-mono">
+                      <span className="text-slate-400">24-Hour Change</span>
+                      <span className={ipo.gmpHistory?.gmp24hChange && ipo.gmpHistory.gmp24hChange > 0 ? 'text-emerald-400 font-bold' : 'text-slate-300'}>
+                        {ipo.gmpHistory?.gmp24hChange ? `${ipo.gmpHistory.gmp24hChange > 0 ? '+' : ''}₹${ipo.gmpHistory.gmp24hChange}` : '₹0'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs font-mono">
+                      <span className="text-slate-400">3-Day Change</span>
+                      <span className={ipo.gmpHistory?.gmp3dChange && ipo.gmpHistory.gmp3dChange > 0 ? 'text-emerald-400 font-bold' : 'text-slate-300'}>
+                        {ipo.gmpHistory?.gmp3dChange ? `${ipo.gmpHistory.gmp3dChange > 0 ? '+' : ''}₹${ipo.gmpHistory.gmp3dChange}` : '₹0'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs font-mono">
+                      <span className="text-slate-400">Highest GMP Observed</span>
+                      <span className="text-emerald-400 font-bold">
+                        ₹{ipo.gmpHistory?.highestGmp || gmpVal || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs font-mono">
+                      <span className="text-slate-400">Estimated Listing Price</span>
+                      <span className="text-emerald-400 font-bold text-sm">
+                        ₹{estListing || '-'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-1">
+                  <span className="font-bold block">GMP Risk Notice:</span>
+                  GMP trades in informal, unregulated circles and can oscillate rapidly before listing day based on broader market volatility.
+                </div>
+              </div>
             </div>
 
-            <div className="lg:col-span-4 space-y-4">
-              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  GMP Momentum & Deltas
-                </h4>
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs font-mono">
-                    <span className="text-slate-400">24-Hour Change</span>
-                    <span className={ipo.gmpHistory?.gmp24hChange && ipo.gmpHistory.gmp24hChange > 0 ? 'text-emerald-400 font-bold' : 'text-slate-300'}>
-                      {ipo.gmpHistory?.gmp24hChange ? `${ipo.gmpHistory.gmp24hChange > 0 ? '+' : ''}₹${ipo.gmpHistory.gmp24hChange}` : '₹0'}
+            {/* Interactive Multi-Lot Bidding & Profit/Loss Calculator */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    <Calculator className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">
+                      Interactive Bidding & Profit / Loss Calculator
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Simulate Retail & HNI lot allocations to project capital outlay, listing day profit, and portfolio returns.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Lot Counter */}
+                <div className="flex items-center space-x-2 bg-slate-950/80 border border-slate-800 p-1.5 rounded-2xl">
+                  <button
+                    onClick={() => setCalcLots((prev) => Math.max(1, prev - 1))}
+                    className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center transition"
+                    title="Decrease 1 Lot"
+                  >
+                    -
+                  </button>
+                  <div className="px-3 text-center min-w-[70px]">
+                    <span className="text-sm font-mono font-bold text-white block leading-tight">
+                      {calcLots} {calcLots === 1 ? 'Lot' : 'Lots'}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {calcLots * (ipo.lotSize || 1)} Shares
                     </span>
                   </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs font-mono">
-                    <span className="text-slate-400">3-Day Change</span>
-                    <span className={ipo.gmpHistory?.gmp3dChange && ipo.gmpHistory.gmp3dChange > 0 ? 'text-emerald-400 font-bold' : 'text-slate-300'}>
-                      {ipo.gmpHistory?.gmp3dChange ? `${ipo.gmpHistory.gmp3dChange > 0 ? '+' : ''}₹${ipo.gmpHistory.gmp3dChange}` : '₹0'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs font-mono">
-                    <span className="text-slate-400">Highest GMP Observed</span>
-                    <span className="text-emerald-400 font-bold">
-                      ₹{ipo.gmpHistory?.highestGmp || gmpVal || 0}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs font-mono">
-                    <span className="text-slate-400">Estimated Listing Price</span>
-                    <span className="text-emerald-400 font-bold text-sm">
-                      ₹{estListing || '-'}
-                    </span>
-                  </div>
+                  <button
+                    onClick={() => setCalcLots((prev) => prev + 1)}
+                    className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center transition"
+                    title="Increase 1 Lot"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-1">
-                <span className="font-bold block">GMP Risk Notice:</span>
-                GMP trades in informal, unregulated circles and can oscillate rapidly before listing day based on broader market volatility.
+              {/* Preset Category Chips */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-400 font-semibold mr-1">Quick Select Category:</span>
+                {[
+                  { label: '1 Lot (Retail Min)', lots: 1 },
+                  { label: '2 Lots', lots: 2 },
+                  { label: '5 Lots', lots: 5 },
+                  {
+                    label: `Max Retail (${Math.max(1, Math.floor(200000 / (((ipo.priceBandHigh || ipo.issuePrice || 100)) * (ipo.lotSize || 1))))} Lots)`,
+                    lots: Math.max(1, Math.floor(200000 / (((ipo.priceBandHigh || ipo.issuePrice || 100)) * (ipo.lotSize || 1)))),
+                  },
+                  {
+                    label: `sHNI Min (${Math.ceil(200001 / (((ipo.priceBandHigh || ipo.issuePrice || 100)) * (ipo.lotSize || 1)))} Lots)`,
+                    lots: Math.ceil(200001 / (((ipo.priceBandHigh || ipo.issuePrice || 100)) * (ipo.lotSize || 1))),
+                  },
+                  {
+                    label: `bHNI Min (${Math.ceil(1000001 / (((ipo.priceBandHigh || ipo.issuePrice || 100)) * (ipo.lotSize || 1)))} Lots)`,
+                    lots: Math.ceil(1000001 / (((ipo.priceBandHigh || ipo.issuePrice || 100)) * (ipo.lotSize || 1))),
+                  },
+                ].map((preset, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCalcLots(preset.lots)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition border ${
+                      calcLots === preset.lots
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm'
+                        : 'bg-slate-950/60 text-slate-400 hover:text-white border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
               </div>
+
+              {/* Calculated Results Matrix */}
+              {(() => {
+                const issueCutoff = ipo.priceBandHigh || ipo.issuePrice || 0;
+                const lotSz = ipo.lotSize || 1;
+                const totalShares = calcLots * lotSz;
+                const totalInvestment = totalShares * issueCutoff;
+                const perShareProfit = gmpVal || 0;
+                const totalProfit = totalShares * perShareProfit;
+                const totalValueOnListing = totalShares * ((estListing || issueCutoff + perShareProfit) || issueCutoff);
+                const roiPercent = issueCutoff > 0 ? (perShareProfit / issueCutoff) * 100 : 0;
+                const categoryName =
+                  totalInvestment <= 200000
+                    ? 'Retail Individual (RII)'
+                    : totalInvestment <= 1000000
+                    ? 'Small HNI (sNII / sHNI)'
+                    : 'Big HNI (bNII / bHNI)';
+
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        Total Capital Required
+                      </span>
+                      <div className="font-mono text-xl font-extrabold text-white">
+                        ₹{totalInvestment.toLocaleString('en-IN')}
+                      </div>
+                      <div className="text-[11px] text-emerald-400 font-medium">
+                        Category: {categoryName}
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        Total Shares Applied
+                      </span>
+                      <div className="font-mono text-xl font-extrabold text-slate-200">
+                        {totalShares.toLocaleString('en-IN')} Shares
+                      </div>
+                      <div className="text-[11px] text-slate-400 font-mono">
+                        {calcLots} {calcLots === 1 ? 'Lot' : 'Lots'} × {lotSz} Shares/Lot
+                      </div>
+                    </div>
+
+                    <div className="bg-emerald-950/60 p-4 rounded-2xl border border-emerald-500/50 shadow-inner space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-emerald-300 block">
+                        Est. Profit / Loss on Listing
+                      </span>
+                      <div className="font-mono text-2xl font-black text-emerald-200">
+                        {totalProfit >= 0 ? '+' : ''}₹{totalProfit.toLocaleString('en-IN')}
+                      </div>
+                      <div className="text-[11px] text-emerald-400 font-bold">
+                        {roiPercent >= 0 ? '+' : ''}{roiPercent.toFixed(1)}% Return on Investment
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                        Est. Total Portfolio Value
+                      </span>
+                      <div className="font-mono text-xl font-extrabold text-emerald-300">
+                        ₹{totalValueOnListing.toLocaleString('en-IN')}
+                      </div>
+                      <div className="text-[11px] text-slate-400 font-mono">
+                        Based on est. debut @ ₹{estListing || issueCutoff + perShareProfit}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}

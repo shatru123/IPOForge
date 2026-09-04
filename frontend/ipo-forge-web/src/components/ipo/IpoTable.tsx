@@ -29,8 +29,8 @@ export const IpoTable: React.FC<IpoTableProps> = ({ ipos, onOpenScoreBreakdown }
             <th className="py-3.5 px-4 text-center">Scores (Gain / LT)</th>
             <th className="py-3.5 px-4">Issue Dates</th>
             <th className="py-3.5 px-4">Price Band</th>
-            <th className="py-3.5 px-4">Issue Size</th>
             <th className="py-3.5 px-4">Current GMP</th>
+            <th className="py-3.5 px-4">Est. Profit / Listing Gain</th>
             <th className="py-3.5 px-4">Subscription</th>
             <th className="py-3.5 px-4 text-right">Actions</th>
           </tr>
@@ -48,6 +48,11 @@ export const IpoTable: React.FC<IpoTableProps> = ({ ipos, onOpenScoreBreakdown }
               : ipo.issuePrice
               ? `₹${ipo.issuePrice}`
               : '-';
+
+            const estProfit = ipo.estimatedProfitPerLot ?? (gmpVal && ipo.lotSize ? gmpVal * ipo.lotSize : null);
+            const listGainPct = ipo.actualListingGainPercent ?? ipo.listingGainPercent;
+            const listGainPerLot = ipo.actualListingGainPerLot ?? (ipo.priceBandHigh && ipo.listingPrice && ipo.lotSize ? (ipo.listingPrice - ipo.priceBandHigh) * ipo.lotSize : null);
+            const listPrice = ipo.actualListingPrice ?? ipo.listingPrice;
 
             return (
               <tr key={ipo.id} className="hover:bg-slate-800/40 transition">
@@ -118,11 +123,6 @@ export const IpoTable: React.FC<IpoTableProps> = ({ ipos, onOpenScoreBreakdown }
                 {/* Price */}
                 <td className="py-3.5 px-4 font-mono text-slate-200">{price}</td>
 
-                {/* Issue Size */}
-                <td className="py-3.5 px-4 font-mono text-slate-200">
-                  {ipo.issueSize ? `₹${ipo.issueSize.toLocaleString('en-IN')} Cr` : '-'}
-                </td>
-
                 {/* GMP */}
                 <td className="py-3.5 px-4">
                   <GmpBadge
@@ -131,6 +131,36 @@ export const IpoTable: React.FC<IpoTableProps> = ({ ipos, onOpenScoreBreakdown }
                     trend={ipo.gmpTrend}
                     size="sm"
                   />
+                </td>
+
+                {/* Est Profit / Listing Gain */}
+                <td className="py-3.5 px-4 font-mono text-xs">
+                  {ipo.status === 'Listed' ? (
+                    <div>
+                      <span className="font-bold text-emerald-400 block">
+                        +{listGainPct ?? 0}%
+                        {listGainPerLot ? ` (+₹${listGainPerLot.toLocaleString('en-IN')})` : ''}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        Listed: {listPrice ? `₹${listPrice}` : '-'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div>
+                      <span className={`font-bold block ${
+                        (estProfit || 0) > 0 ? 'text-emerald-400' : (estProfit || 0) < 0 ? 'text-rose-400' : 'text-slate-300'
+                      }`}>
+                        {estProfit !== null && estProfit !== undefined
+                          ? `${estProfit >= 0 ? '+' : ''}₹${estProfit.toLocaleString('en-IN')}/lot`
+                          : gmpVal && ipo.lotSize
+                          ? `+₹${(gmpVal * ipo.lotSize).toLocaleString('en-IN')}/lot`
+                          : '₹0 (At Par)'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        Est: ₹{ipo.estimatedListingPrice || ((ipo.priceBandHigh || 0) + (gmpVal || 0)) || '-'}
+                      </span>
+                    </div>
+                  )}
                 </td>
 
                 {/* Subscription */}

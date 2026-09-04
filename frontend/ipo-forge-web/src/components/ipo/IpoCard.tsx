@@ -119,7 +119,7 @@ export const IpoCard: React.FC<IpoCardProps> = ({ ipo, onOpenScoreBreakdown }) =
         </div>
 
         {/* Dual Score Rings Section */}
-        <div className="bg-slate-950/50 border border-slate-800/80 rounded-xl p-3 my-3 grid grid-cols-2 gap-2">
+        <div className="bg-slate-950/50 border border-slate-800/80 rounded-xl p-3 my-2.5 grid grid-cols-2 gap-2">
           <ScoreRing
             score={ipo.listingGainScore}
             label="Listing Gain"
@@ -135,6 +135,47 @@ export const IpoCard: React.FC<IpoCardProps> = ({ ipo, onOpenScoreBreakdown }) =
             onClick={onOpenScoreBreakdown ? () => onOpenScoreBreakdown(ipo) : undefined}
           />
         </div>
+
+        {/* Profit / Loss & Listing Day Intelligence Highlight */}
+        {ipo.status === 'Listed' ? (
+          <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-2.5 my-2.5 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] text-emerald-400 font-semibold uppercase block">Exact Listing Gain</span>
+              <span className="font-mono font-bold text-emerald-300 text-xs">
+                +{ipo.actualListingGainPercent ?? ipo.listingGainPercent ?? (ipo.priceBandHigh && ipo.listingPrice ? Math.round(((ipo.listingPrice - ipo.priceBandHigh) / ipo.priceBandHigh) * 100) : 0)}%
+                {ipo.actualListingGainPerLot ? ` (+₹${ipo.actualListingGainPerLot.toLocaleString('en-IN')}/lot)` : ipo.priceBandHigh && ipo.listingPrice && ipo.lotSize ? ` (+₹${((ipo.listingPrice - ipo.priceBandHigh) * ipo.lotSize).toLocaleString('en-IN')}/lot)` : ''}
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] text-slate-400 uppercase block">Listed / Debut Price</span>
+              <span className="font-mono font-bold text-white text-xs">
+                ₹{ipo.actualListingPrice ?? ipo.listingPrice ?? '-'}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5 my-2.5 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] text-slate-400 font-semibold uppercase block">Est. Profit/Loss (per Lot)</span>
+              <span className={`font-mono font-bold text-xs ${
+                (gmpVal || 0) > 0 ? 'text-emerald-400' : (gmpVal || 0) < 0 ? 'text-rose-400' : 'text-slate-300'
+              }`}>
+                {ipo.estimatedProfitPerLot !== undefined && ipo.estimatedProfitPerLot !== null
+                  ? `${ipo.estimatedProfitPerLot >= 0 ? '+' : ''}₹${ipo.estimatedProfitPerLot.toLocaleString('en-IN')}`
+                  : gmpVal && ipo.lotSize
+                  ? `${gmpVal >= 0 ? '+' : ''}₹${(gmpVal * ipo.lotSize).toLocaleString('en-IN')}`
+                  : '₹0 (At Par)'}
+                {gmpPct !== undefined && gmpPct !== 0 ? ` (${gmpPct >= 0 ? '+' : ''}${gmpPct}%)` : ''}
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] text-slate-400 uppercase block">Est. Listing Price</span>
+              <span className="font-mono font-bold text-slate-200 text-xs">
+                ₹{ipo.estimatedListingPrice || ((ipo.priceBandHigh || 0) + (gmpVal || 0)) || 'TBD'}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Core Deal Specs Grid */}
         <div className="grid grid-cols-2 gap-2.5 text-xs pt-1 pb-2">

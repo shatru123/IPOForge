@@ -26,12 +26,20 @@ public class IpoSummaryDto
     public decimal FreshIssueAmount { get; set; }
     public decimal OFSAmount { get; set; }
 
-    // Latest GMP snapshot
+    // Latest GMP snapshot & Estimated Profit/Loss
     public decimal? LatestGmp { get; set; }
     public decimal? LatestGmpPercentage { get; set; }
     public decimal? EstimatedListingPrice { get; set; }
+    public decimal? EstimatedProfitPerLot { get; set; }
     public GmpTrend? GmpTrend { get; set; }
     public decimal? Gmp24hChange { get; set; }
+
+    // Actual Listing Day Performance (for Listed IPOs)
+    public decimal? ListingPrice { get; set; }
+    public decimal? ListingGainPercent { get; set; }
+    public decimal? ActualListingGainAmount { get; set; }
+    public decimal? ActualListingGainPerLot { get; set; }
+    public decimal? Day1ClosePrice { get; set; }
 
     // Latest Subscription snapshot
     public decimal? TotalSubscription { get; set; }
@@ -71,10 +79,6 @@ public class IpoDetailDto : IpoSummaryDto
     public string Registrar { get; set; } = string.Empty;
     public string LeadManagers { get; set; } = string.Empty;
     public string Exchange { get; set; } = string.Empty;
-
-    public decimal? ActualListingPrice { get; set; }
-    public decimal? ActualListingGainPercent { get; set; }
-    public decimal? Day1ClosePrice { get; set; }
 
     public decimal FreshIssuePercentage => IssueSize > 0 ? Math.Round((FreshIssueAmount / IssueSize) * 100, 2) : 0;
     public decimal OfsPercentage => IssueSize > 0 ? Math.Round((OFSAmount / IssueSize) * 100, 2) : 0;

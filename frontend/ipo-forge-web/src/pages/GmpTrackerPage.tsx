@@ -202,7 +202,8 @@ export const GmpTrackerPage: React.FC = () => {
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4 text-right">Price Band</th>
                 <th className="py-3 px-4">Latest GMP</th>
-                <th className="py-3 px-4 text-right">Est. Listing Price</th>
+                <th className="py-3 px-4">Est. Profit / Listing Gain</th>
+                <th className="py-3 px-4 text-right">Est / Listed Price</th>
                 <th className="py-3 px-4 text-right">Listing Gain Score</th>
                 <th className="py-3 px-4 text-right">Action</th>
               </tr>
@@ -213,6 +214,10 @@ export const GmpTrackerPage: React.FC = () => {
                 const gmpPct = ipo.latestGmpPercentage ?? ipo.currentGmpPercentage;
                 const price = ipo.priceBandHigh || ipo.issuePrice || 0;
                 const estPrice = ipo.estimatedListingPrice || (price + (gmpVal || 0));
+                const estProfit = ipo.estimatedProfitPerLot ?? (gmpVal && ipo.lotSize ? gmpVal * ipo.lotSize : null);
+                const listGainPct = ipo.actualListingGainPercent ?? ipo.listingGainPercent;
+                const listGainPerLot = ipo.actualListingGainPerLot ?? (ipo.priceBandHigh && ipo.listingPrice && ipo.lotSize ? (ipo.listingPrice - ipo.priceBandHigh) * ipo.lotSize : null);
+                const listPrice = ipo.actualListingPrice ?? ipo.listingPrice;
 
                 return (
                   <tr key={ipo.id} className="hover:bg-slate-800/40 transition">
@@ -236,8 +241,36 @@ export const GmpTrackerPage: React.FC = () => {
                         size="sm"
                       />
                     </td>
+                    <td className="py-3 px-4 font-mono text-xs">
+                      {ipo.status === 'Listed' ? (
+                        <div>
+                          <span className="font-bold text-emerald-400 block">
+                            +{listGainPct ?? 0}%
+                            {listGainPerLot ? ` (+₹${listGainPerLot.toLocaleString('en-IN')})` : ''}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            Debut: {listPrice ? `₹${listPrice}` : '-'}
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <span className={`font-bold block ${
+                            (estProfit || 0) > 0 ? 'text-emerald-400' : (estProfit || 0) < 0 ? 'text-rose-400' : 'text-slate-300'
+                          }`}>
+                            {estProfit !== null && estProfit !== undefined
+                              ? `${estProfit >= 0 ? '+' : ''}₹${estProfit.toLocaleString('en-IN')}/lot`
+                              : gmpVal && ipo.lotSize
+                              ? `+₹${(gmpVal * ipo.lotSize).toLocaleString('en-IN')}/lot`
+                              : '₹0 (At Par)'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {ipo.lotSize ? `${ipo.lotSize} shs/lot` : ''}
+                          </span>
+                        </div>
+                      )}
+                    </td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-slate-100">
-                      ₹{estPrice || '-'}
+                      {ipo.status === 'Listed' ? (listPrice ? `₹${listPrice}` : '-') : (estPrice ? `₹${estPrice}` : '-')}
                     </td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400">
                       {ipo.listingGainScore}/100

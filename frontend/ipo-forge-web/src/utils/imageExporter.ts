@@ -370,14 +370,30 @@ export function generateWhatsAppShareText(ipos: IpoSummary[], activeOnly: boolea
         ? `🟢 OPEN NOW (Closes on ${formatShortDate(ipo.closeDate)})`
         : `🔵 UPCOMING (Opens on ${formatShortDate(ipo.openDate)})`;
 
-    text += `📌 *${r.rank}. ${ipo.name}*\n`;
-    text += `• *Status:* ${statusBadge}\n`;
-    text += `• *Bidding Window:* ${dates}\n`;
-    text += `• *Price Band:* ${price} | Min Inv: ₹${(ipo.minimumInvestment || 0).toLocaleString('en-IN')}\n`;
-    text += `• *Live GMP:* +₹${gmpVal} (+${gmpPct}%) | Est. Listing: ${estListing}\n`;
-    text += `• *Listing Gain Score:* ${ipo.listingGainScore || '-'}/100 | Long-Term: ${ipo.longTermScore || '-'}/100\n`;
-    text += `• *Subscription:* ${sub}\n`;
-    text += `• *Decision:* _${r.verdict}_\n\n`;
+    if (ipo.status === 'Listed') {
+      const listGain = ipo.actualListingGainPercent ?? ipo.listingGainPercent ?? gmpPct;
+      const listPrice = ipo.actualListingPrice ?? ipo.listingPrice;
+      const listGainPerLot = ipo.actualListingGainPerLot ?? (ipo.priceBandHigh && ipo.listingPrice && ipo.lotSize ? (ipo.listingPrice - ipo.priceBandHigh) * ipo.lotSize : 0);
+      text += `📌 *${r.rank}. ${ipo.name}*\n`;
+      text += `• *Status:* ${statusBadge}\n`;
+      text += `• *Issue Price:* ${price} | *Debut Price:* ₹${listPrice || '-'}\n`;
+      text += `• *Exact Listing Gain:* +${listGain}% (+₹${listGainPerLot.toLocaleString('en-IN')}/lot)\n`;
+      text += `• *Listing Score:* ${ipo.listingGainScore || '-'}/100 | Long-Term: ${ipo.longTermScore || '-'}/100\n`;
+      text += `• *Subscription:* ${sub}\n`;
+      text += `• *Decision:* _${r.verdict}_\n\n`;
+    } else {
+      const estProfit = ipo.estimatedProfitPerLot ?? (gmpVal && ipo.lotSize ? gmpVal * ipo.lotSize : 0);
+      text += `📌 *${r.rank}. ${ipo.name}*\n`;
+      text += `• *Status:* ${statusBadge}\n`;
+      text += `• *Bidding Window:* ${dates}\n`;
+      text += `• *Price Band:* ${price} | Lot: ${ipo.lotSize || '-'} shs (Min: ₹${(ipo.minimumInvestment || 0).toLocaleString('en-IN')})\n`;
+      text += `• *Current GMP:* +₹${gmpVal} (+${gmpPct}%)\n`;
+      text += `• *Est. Profit/Loss (per Lot):* ${estProfit >= 0 ? '+' : ''}₹${estProfit.toLocaleString('en-IN')}\n`;
+      text += `• *Est. Listing Price:* ${estListing}\n`;
+      text += `• *Listing Score:* ${ipo.listingGainScore || '-'}/100 | Long-Term: ${ipo.longTermScore || '-'}/100\n`;
+      text += `• *Subscription:* ${sub}\n`;
+      text += `• *Decision:* _${r.verdict}_\n\n`;
+    }
   });
 
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;

@@ -51,12 +51,14 @@ export interface IpoSummary {
   freshIssueAmount?: number;
   ofsAmount?: number;
   
-  // GMP fields (supporting both latestGmp and currentGmp)
+  // GMP & Estimated Profit/Loss fields
   latestGmp?: number;
   currentGmp?: number;
   latestGmpPercentage?: number;
   currentGmpPercentage?: number;
   estimatedListingPrice?: number;
+  estimatedProfitPerLot?: number;
+  estimatedReturnPercent?: number;
   gmpTrend?: GmpTrend;
   gmp24hChange?: number;
 
@@ -81,8 +83,11 @@ export interface IpoSummary {
   // Listing Day outcomes
   actualListingPrice?: number;
   listingPrice?: number;
+  actualListingGainAmount?: number;
+  actualListingGainPerLot?: number;
   actualListingGainPercent?: number;
   listingGainPercent?: number;
+  day1ClosePrice?: number;
 }
 
 export interface IpoDetail extends IpoSummary {

@@ -259,27 +259,66 @@ export const IpoComparisonModal: React.FC<IpoComparisonModalProps> = ({
 
                     {/* Specs Table */}
                     <div className="space-y-2 text-xs divide-y divide-slate-800/60 pt-1">
-                      <div className="flex justify-between py-1">
-                        <span className="text-slate-400">Live GMP</span>
-                        <GmpBadge
-                          gmp={ipo.latestGmp}
-                          percentage={ipo.latestGmpPercentage}
-                          trend={ipo.gmpTrend}
-                          size="sm"
-                        />
-                      </div>
-                      <div className="flex justify-between py-1">
-                        <span className="text-slate-400">Est. Listing Price</span>
-                        <span className="font-mono font-bold text-white">
-                          ₹{ipo.estimatedListingPrice || ipo.priceBandHigh || '-'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-1">
-                        <span className="text-slate-400">Price Band</span>
-                        <span className="font-mono font-bold text-slate-200">
-                          ₹{ipo.priceBandLow || 0} - ₹{ipo.priceBandHigh || 0}
-                        </span>
-                      </div>
+                      {ipo.status === 'Listed' ? (
+                        <>
+                          <div className="flex justify-between py-1 bg-emerald-950/30 p-2 rounded-lg border border-emerald-500/30">
+                            <span className="text-emerald-400 font-semibold">Exact Listing Gain</span>
+                            <span className="font-mono font-bold text-emerald-300">
+                              +{ipo.actualListingGainPercent ?? ipo.listingGainPercent ?? 0}%
+                              {ipo.actualListingGainPerLot ? ` (+₹${ipo.actualListingGainPerLot.toLocaleString('en-IN')})` : ''}
+                            </span>
+                          </div>
+                          <div className="flex justify-between py-1">
+                            <span className="text-slate-400">Debut / Listed Price</span>
+                            <span className="font-mono font-bold text-white">
+                              ₹{ipo.actualListingPrice ?? ipo.listingPrice ?? '-'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between py-1">
+                            <span className="text-slate-400">Issue Cut-off Price</span>
+                            <span className="font-mono font-bold text-slate-200">
+                              ₹{ipo.priceBandHigh || ipo.issuePrice || '-'}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex justify-between py-1 bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+                            <span className="text-slate-300 font-semibold">Est. Profit/Loss (per Lot)</span>
+                            <span className={`font-mono font-bold ${
+                              (ipo.latestGmp || 0) > 0 ? 'text-emerald-400' : (ipo.latestGmp || 0) < 0 ? 'text-rose-400' : 'text-slate-300'
+                            }`}>
+                              {ipo.estimatedProfitPerLot !== undefined && ipo.estimatedProfitPerLot !== null
+                                ? `${ipo.estimatedProfitPerLot >= 0 ? '+' : ''}₹${ipo.estimatedProfitPerLot.toLocaleString('en-IN')}`
+                                : ipo.latestGmp && ipo.lotSize
+                                ? `+₹${(ipo.latestGmp * ipo.lotSize).toLocaleString('en-IN')}`
+                                : '₹0'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between py-1">
+                            <span className="text-slate-400">Live GMP</span>
+                            <GmpBadge
+                              gmp={ipo.latestGmp}
+                              percentage={ipo.latestGmpPercentage}
+                              trend={ipo.gmpTrend}
+                              size="sm"
+                            />
+                          </div>
+                          <div className="flex justify-between py-1">
+                            <span className="text-slate-400">Est. Listing Price</span>
+                            <span className="font-mono font-bold text-white">
+                              ₹{ipo.estimatedListingPrice || ipo.priceBandHigh || '-'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between py-1">
+                            <span className="text-slate-400">Price Band</span>
+                            <span className="font-mono font-bold text-slate-200">
+                              ₹{ipo.priceBandLow || 0} - ₹{ipo.priceBandHigh || 0}
+                            </span>
+                          </div>
+                        </>
+                      )}
+
                       <div className="flex justify-between py-1">
                         <span className="text-slate-400">Lot Size / Min Inv</span>
                         <span className="font-mono text-slate-200">
