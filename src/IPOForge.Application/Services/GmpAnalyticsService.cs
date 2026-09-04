@@ -105,14 +105,30 @@ public class GmpAnalyticsService : IGmpAnalyticsService
         return GmpTrend.Stable;
     }
 
-    public IReadOnlyList<GmpMoverDto> GetTopMovers(IReadOnlyList<IPO> ipos, int count = 5)
+    public IReadOnlyList<GmpMoverDto> GetTopMovers(IReadOnlyList<IPO> ipos, int count = 8)
     {
         var list = new List<GmpMoverDto>();
 
-        foreach (var ipo in ipos)
+        // Focus on active/current & upcoming/closed issues with live GMP
+        var targetIpos = ipos
+            .Where(i => i.Status == IpoStatus.Open || i.Status == IpoStatus.Upcoming || i.Status == IpoStatus.Closed)
+            .ToList();
+
+        if (!targetIpos.Any())
+        {
+            targetIpos = ipos.ToList();
+        }
+
+        foreach (var ipo in targetIpos)
         {
             var analysis = AnalyzeGmpHistory(ipo);
-            if (ipo.GmpHistories.Count < 2) continue;
+            var gmpVal = analysis.CurrentGmp > 0 ? analysis.CurrentGmp : (ipo.GmpHistories.LastOrDefault()?.GMP ?? 0);
+            var gmpPct = analysis.CurrentGmpPercentage > 0 ? analysis.CurrentGmpPercentage : (ipo.PriceBandHigh > 0 && gmpVal > 0 ? Math.Round((gmpVal / ipo.PriceBandHigh) * 100, 2) : 0);
+
+            if (gmpVal <= 0 && gmpPct <= 0) continue;
+
+            var lotSize = ipo.LotSize > 0 ? ipo.LotSize : (ipo.IpoType == IpoType.Sme ? 1200 : 30);
+            var estProfitPerLot = gmpVal * lotSize;
 
             list.Add(new GmpMoverDto
             {
@@ -121,15 +137,21 @@ public class GmpAnalyticsService : IGmpAnalyticsService
                 Symbol = ipo.Symbol,
                 IpoType = ipo.IpoType,
                 Status = ipo.Status,
-                CurrentGmp = analysis.CurrentGmp,
-                CurrentGmpPercentage = analysis.CurrentGmpPercentage,
+                OpenDate = ipo.OpenDate,
+                CloseDate = ipo.CloseDate,
+                ListingDate = ipo.ListingDate,
+                PriceBandHigh = ipo.PriceBandHigh,
+                LotSize = lotSize,
+                EstimatedProfitPerLot = estProfitPerLot,
+                CurrentGmp = gmpVal,
+                CurrentGmpPercentage = gmpPct,
                 ChangeAmount = analysis.Gmp24hChange,
                 ChangePercent = analysis.PriceBandHigh > 0 ? Math.Round((analysis.Gmp24hChange / analysis.PriceBandHigh) * 100, 2) : 0,
                 Trend = analysis.Trend
             });
         }
 
-        return list;
+        return list.OrderByDescending(m => m.CurrentGmpPercentage).Take(count).ToList();
     }
 
     public GmpAccuracyAnalyticsDto GetAccuracyAnalytics(IReadOnlyList<IPO> listedIpos)

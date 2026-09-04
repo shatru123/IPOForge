@@ -180,6 +180,12 @@ export interface GmpMover {
   symbol?: string;
   ipoType: IpoType;
   status: IpoStatus;
+  openDate?: string;
+  closeDate?: string;
+  listingDate?: string;
+  priceBandHigh?: number;
+  lotSize?: number;
+  estimatedProfitPerLot?: number;
   currentGmp: number;
   currentGmpPercentage: number;
   changeAmount?: number;

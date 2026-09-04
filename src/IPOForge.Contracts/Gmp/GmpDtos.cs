@@ -43,6 +43,12 @@ public class GmpMoverDto
     public string Symbol { get; set; } = string.Empty;
     public IpoType IpoType { get; set; }
     public IpoStatus Status { get; set; }
+    public DateTime? OpenDate { get; set; }
+    public DateTime? CloseDate { get; set; }
+    public DateTime? ListingDate { get; set; }
+    public decimal? PriceBandHigh { get; set; }
+    public int? LotSize { get; set; }
+    public decimal? EstimatedProfitPerLot { get; set; }
     public decimal CurrentGmp { get; set; }
     public decimal CurrentGmpPercentage { get; set; }
     public decimal ChangeAmount { get; set; }
