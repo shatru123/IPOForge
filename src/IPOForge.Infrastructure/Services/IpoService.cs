@@ -124,22 +124,25 @@ public class IpoService : IIpoService
         }
 
         // Sorting
-        summaryList = (filter.SortBy?.ToLower(), filter.SortDescending) switch
+        summaryList = (filter.SortBy?.ToLower().Replace("_", ""), filter.SortDescending) switch
         {
-            ("gmp", true) => summaryList.OrderByDescending(s => s.LatestGmp ?? 0).ToList(),
-            ("gmp", false) => summaryList.OrderBy(s => s.LatestGmp ?? 0).ToList(),
-            ("gmppercent", true) => summaryList.OrderByDescending(s => s.LatestGmpPercentage ?? 0).ToList(),
-            ("gmppercent", false) => summaryList.OrderBy(s => s.LatestGmpPercentage ?? 0).ToList(),
+            ("gmp", true) => summaryList.OrderByDescending(s => s.LatestGmp ?? 0).ThenByDescending(s => s.LatestGmpPercentage ?? 0).ToList(),
+            ("gmp", false) => summaryList.OrderBy(s => s.LatestGmp ?? 0).ThenBy(s => s.LatestGmpPercentage ?? 0).ToList(),
+            ("gmppercent" or "gmppercentage", true) => summaryList.OrderByDescending(s => s.LatestGmpPercentage ?? 0).ThenByDescending(s => s.LatestGmp ?? 0).ToList(),
+            ("gmppercent" or "gmppercentage", false) => summaryList.OrderBy(s => s.LatestGmpPercentage ?? 0).ThenBy(s => s.LatestGmp ?? 0).ToList(),
             ("subscription", true) => summaryList.OrderByDescending(s => s.TotalSubscription ?? 0).ToList(),
             ("subscription", false) => summaryList.OrderBy(s => s.TotalSubscription ?? 0).ToList(),
             ("listingscore", true) => summaryList.OrderByDescending(s => s.ListingGainScore ?? 0).ToList(),
             ("listingscore", false) => summaryList.OrderBy(s => s.ListingGainScore ?? 0).ToList(),
             ("longtermscore", true) => summaryList.OrderByDescending(s => s.LongTermScore ?? 0).ToList(),
             ("longtermscore", false) => summaryList.OrderBy(s => s.LongTermScore ?? 0).ToList(),
+            ("gain" or "listinggain" or "listinggainpercent" or "actualgain", true) => summaryList.OrderByDescending(s => s.ListingGainPercent ?? 0).ToList(),
+            ("gain" or "listinggain" or "listinggainpercent" or "actualgain", false) => summaryList.OrderBy(s => s.ListingGainPercent ?? 0).ToList(),
             ("issuesize", true) => summaryList.OrderByDescending(s => s.IssueSize).ToList(),
             ("issuesize", false) => summaryList.OrderBy(s => s.IssueSize).ToList(),
-            ("opendate", false) => summaryList.OrderBy(s => s.OpenDate ?? DateTime.MaxValue).ToList(),
-            _ => summaryList.OrderByDescending(s => s.OpenDate ?? DateTime.MinValue).ToList()
+            ("opendate", false) => summaryList.OrderBy(s => s.OpenDate.HasValue ? 0 : 1).ThenBy(s => s.OpenDate ?? DateTime.MaxValue).ToList(),
+            ("opendate", true) => summaryList.OrderBy(s => s.OpenDate.HasValue ? 0 : 1).ThenByDescending(s => s.OpenDate ?? DateTime.MinValue).ToList(),
+            _ => summaryList.OrderBy(s => s.OpenDate.HasValue ? 0 : 1).ThenByDescending(s => s.OpenDate ?? DateTime.MinValue).ToList()
         };
 
         var total = summaryList.Count;
@@ -282,12 +285,14 @@ public class IpoService : IIpoService
             .Include(i => i.SubscriptionHistories)
             .Include(i => i.Risks)
             .Include(i => i.Scores)
-            .OrderBy(i => i.OpenDate)
             .ToListAsync(cancellationToken);
 
         return list
             .Select(MapToSummaryDto)
             .Where(s => s.Status == IpoStatus.Upcoming)
+            .OrderBy(s => s.OpenDate.HasValue ? 0 : 1)
+            .ThenBy(s => s.OpenDate ?? DateTime.MaxValue)
+            .ThenByDescending(s => s.LatestGmpPercentage ?? 0)
             .ToList();
     }
 
@@ -306,6 +311,7 @@ public class IpoService : IIpoService
         return list
             .Select(MapToSummaryDto)
             .Where(s => s.Status == IpoStatus.Open)
+            .OrderBy(s => s.CloseDate ?? DateTime.MaxValue)
             .ToList();
     }
 
@@ -322,7 +328,11 @@ public class IpoService : IIpoService
             .OrderByDescending(i => i.ListingDate)
             .ToListAsync(cancellationToken);
 
-        return list.Select(MapToSummaryDto).ToList();
+        return list
+            .Select(MapToSummaryDto)
+            .OrderByDescending(s => s.ListingDate ?? DateTime.MinValue)
+            .ThenByDescending(s => s.ListingGainPercent ?? 0)
+            .ToList();
     }
 
     public async Task<GmpHistoryDto?> GetGmpHistoryAsync(Guid ipoId, CancellationToken cancellationToken = default)

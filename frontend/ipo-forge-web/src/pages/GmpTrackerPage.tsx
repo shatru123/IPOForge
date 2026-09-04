@@ -6,7 +6,7 @@ import { GmpBadge } from '../components/common/GmpBadge';
 import { IpoStatusBadge } from '../components/common/IpoStatusBadge';
 import { GmpAccuracyScatterChart } from '../components/charts/GmpAccuracyScatterChart';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { Target, Activity, Flame, ArrowUpRight } from 'lucide-react';
+import { Target, Activity, Flame, ArrowUpRight, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export const GmpTrackerPage: React.FC = () => {
   const [movers, setMovers] = useState<GmpMover[]>([]);
@@ -14,13 +14,19 @@ export const GmpTrackerPage: React.FC = () => {
   const [ipos, setIpos] = useState<IpoSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Table filtering & pagination state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSegment, setSelectedSegment] = useState<'ALL' | 'Mainboard' | 'Sme' | 'Active' | 'Listed'>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+
   useEffect(() => {
     async function loadGmpData() {
       try {
         const [moversData, accuracyData, iposData] = await Promise.all([
           api.getTopGmpGainers(),
           api.getGmpAccuracy(),
-          api.getIpos({ pageSize: 50, sortBy: 'gmpPercentage', sortDescending: true }),
+          api.getIpos({ pageSize: 100, sortBy: 'gmpPercentage', sortDescending: true }),
         ]);
         setMovers(moversData || []);
         setAccuracy(accuracyData);
@@ -33,6 +39,25 @@ export const GmpTrackerPage: React.FC = () => {
     }
     loadGmpData();
   }, []);
+
+  const filteredIpos = ipos.filter((ipo) => {
+    if (selectedSegment === 'Mainboard' && ipo.ipoType !== 'Mainboard') return false;
+    if (selectedSegment === 'Sme' && ipo.ipoType !== 'Sme') return false;
+    if (selectedSegment === 'Active' && ipo.status !== 'Open' && ipo.status !== 'Upcoming') return false;
+    if (selectedSegment === 'Listed' && ipo.status !== 'Listed') return false;
+
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      const matchName = ipo.name.toLowerCase().includes(q);
+      const matchSymbol = ipo.symbol?.toLowerCase().includes(q);
+      const matchSector = ipo.sector?.toLowerCase().includes(q);
+      if (!matchName && !matchSymbol && !matchSector) return false;
+    }
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredIpos.length / PAGE_SIZE));
+  const pagedIpos = filteredIpos.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   if (loading) {
     return (
@@ -102,13 +127,40 @@ export const GmpTrackerPage: React.FC = () => {
 
       {/* Section 1: Comprehensive Live GMP Master Board (First Section) */}
       <section className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
           <div>
             <h2 className="text-lg font-bold text-white tracking-tight">Comprehensive Live GMP Master Board</h2>
             <p className="text-xs text-slate-400">Real-time dealer aggregates, estimated lot return, and quantitative rating</p>
           </div>
-          <div className="text-xs text-emerald-400 font-medium">
-            Showing {ipos.length} active, upcoming & recent issues
+
+          {/* Search & Filter Controls */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Search Input */}
+            <div className="relative min-w-[200px]">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                placeholder="Search IPO name, sector..."
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+              />
+            </div>
+
+            {/* Segment Tabs */}
+            <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1 text-xs">
+              {(['ALL', 'Mainboard', 'Sme', 'Active', 'Listed'] as const).map((seg) => (
+                <button
+                  key={seg}
+                  onClick={() => { setSelectedSegment(seg); setCurrentPage(1); }}
+                  className={`px-3 py-1 rounded-lg font-semibold transition ${
+                    selectedSegment === seg ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {seg === 'ALL' ? 'All' : seg === 'Sme' ? 'SME' : seg}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -127,87 +179,125 @@ export const GmpTrackerPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {ipos.map((ipo) => {
-                const gmpVal = ipo.latestGmp ?? ipo.currentGmp;
-                const gmpPct = ipo.latestGmpPercentage ?? ipo.currentGmpPercentage;
-                const price = ipo.priceBandHigh || ipo.issuePrice || 0;
-                const estPrice = ipo.estimatedListingPrice || (price + (gmpVal || 0));
-                const estProfit = ipo.estimatedProfitPerLot ?? (gmpVal && ipo.lotSize ? gmpVal * ipo.lotSize : null);
-                const listGainPct = ipo.actualListingGainPercent ?? ipo.listingGainPercent;
-                const listGainPerLot = ipo.actualListingGainPerLot ?? (ipo.priceBandHigh && ipo.listingPrice && ipo.lotSize ? (ipo.listingPrice - ipo.priceBandHigh) * ipo.lotSize : null);
-                const listPrice = ipo.actualListingPrice ?? ipo.listingPrice;
+              {pagedIpos.length > 0 ? (
+                pagedIpos.map((ipo) => {
+                  const gmpVal = ipo.latestGmp ?? ipo.currentGmp;
+                  const gmpPct = ipo.latestGmpPercentage ?? ipo.currentGmpPercentage;
+                  const price = ipo.priceBandHigh || ipo.issuePrice || 0;
+                  const estPrice = ipo.estimatedListingPrice || (price + (gmpVal || 0));
+                  const estProfit = ipo.estimatedProfitPerLot ?? (gmpVal && ipo.lotSize ? gmpVal * ipo.lotSize : null);
+                  const listGainPct = ipo.actualListingGainPercent ?? ipo.listingGainPercent;
+                  const listGainPerLot = ipo.actualListingGainPerLot ?? (ipo.priceBandHigh && ipo.listingPrice && ipo.lotSize ? (ipo.listingPrice - ipo.priceBandHigh) * ipo.lotSize : null);
+                  const listPrice = ipo.actualListingPrice ?? ipo.listingPrice;
 
-                return (
-                  <tr key={ipo.id} className="hover:bg-slate-800/40 transition">
-                    <td className="py-3 px-4">
-                      <Link to={`/ipos/${ipo.id}`} className="font-bold text-white hover:text-emerald-400 transition">
-                        {ipo.name}
-                      </Link>
-                      <span className="text-[10px] text-slate-500 block">{ipo.sector} • {ipo.ipoType}</span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <IpoStatusBadge status={ipo.status} />
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono text-slate-200">
-                      ₹{price || '-'}
-                    </td>
-                    <td className="py-3 px-4">
-                      <GmpBadge
-                        gmp={gmpVal}
-                        percentage={gmpPct}
-                        trend={ipo.gmpTrend}
-                        size="sm"
-                      />
-                    </td>
-                    <td className="py-3 px-4 font-mono text-xs">
-                      {ipo.status === 'Listed' ? (
-                        <div>
-                          <span className="font-bold text-emerald-400 block">
-                            +{listGainPct ?? 0}%
-                            {listGainPerLot ? ` (+₹${listGainPerLot.toLocaleString('en-IN')})` : ''}
-                          </span>
-                          <span className="text-[10px] text-slate-400">
-                            Debut: {listPrice ? `₹${listPrice}` : '-'}
-                          </span>
-                        </div>
-                      ) : (
-                        <div>
-                          <span className={`font-bold block ${
-                            (estProfit || 0) > 0 ? 'text-emerald-400' : (estProfit || 0) < 0 ? 'text-rose-400' : 'text-slate-300'
-                          }`}>
-                            {estProfit !== null && estProfit !== undefined
-                              ? `${estProfit >= 0 ? '+' : ''}₹${estProfit.toLocaleString('en-IN')}/lot`
-                              : gmpVal && ipo.lotSize
-                              ? `+₹${(gmpVal * ipo.lotSize).toLocaleString('en-IN')}/lot`
-                              : '₹0 (At Par)'}
-                          </span>
-                          <span className="text-[10px] text-slate-400">
-                            {ipo.lotSize ? `${ipo.lotSize} shs/lot` : ''}
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-slate-100">
-                      {ipo.status === 'Listed' ? (listPrice ? `₹${listPrice}` : '-') : (estPrice ? `₹${estPrice}` : '-')}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400">
-                      {ipo.listingGainScore}/100
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <Link
-                        to={`/ipos/${ipo.id}`}
-                        className="inline-flex items-center text-xs font-semibold text-emerald-400 hover:text-emerald-300"
-                      >
-                        <span>Analyze</span>
-                        <ArrowUpRight className="w-3.5 h-3.5 ml-0.5" />
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
+                  return (
+                    <tr key={ipo.id} className="hover:bg-slate-800/40 transition">
+                      <td className="py-3 px-4">
+                        <Link to={`/ipos/${ipo.id}`} className="font-bold text-white hover:text-emerald-400 transition">
+                          {ipo.name}
+                        </Link>
+                        <span className="text-[10px] text-slate-500 block">{ipo.sector} • {ipo.ipoType}</span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <IpoStatusBadge status={ipo.status} />
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-slate-200">
+                        ₹{price || '-'}
+                      </td>
+                      <td className="py-3 px-4">
+                        <GmpBadge
+                          gmp={gmpVal}
+                          percentage={gmpPct}
+                          trend={ipo.gmpTrend}
+                          size="sm"
+                        />
+                      </td>
+                      <td className="py-3 px-4 font-mono text-xs">
+                        {ipo.status === 'Listed' ? (
+                          <div>
+                            <span className="font-bold text-emerald-400 block">
+                              +{listGainPct ?? 0}%
+                              {listGainPerLot ? ` (+₹${listGainPerLot.toLocaleString('en-IN')})` : ''}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              Debut: {listPrice ? `₹${listPrice}` : '-'}
+                            </span>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className={`font-bold block ${
+                              (estProfit || 0) > 0 ? 'text-emerald-400' : (estProfit || 0) < 0 ? 'text-rose-400' : 'text-slate-300'
+                            }`}>
+                              {estProfit !== null && estProfit !== undefined
+                                ? `${estProfit >= 0 ? '+' : ''}₹${estProfit.toLocaleString('en-IN')}/lot`
+                                : gmpVal && ipo.lotSize
+                                ? `+₹${(gmpVal * ipo.lotSize).toLocaleString('en-IN')}/lot`
+                                : '₹0 (At Par)'}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {ipo.lotSize ? `${ipo.lotSize} shs/lot` : ''}
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-100">
+                        {ipo.status === 'Listed' ? (listPrice ? `₹${listPrice}` : '-') : (estPrice ? `₹${estPrice}` : '-')}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400">
+                        {ipo.listingGainScore}/100
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <Link
+                          to={`/ipos/${ipo.id}`}
+                          className="inline-flex items-center text-xs font-semibold text-emerald-400 hover:text-emerald-300"
+                        >
+                          <span>Analyze</span>
+                          <ArrowUpRight className="w-3.5 h-3.5 ml-0.5" />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                    No IPOs found matching the filter "{searchTerm}".
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* Master Board Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-4 border-t border-slate-800 text-xs">
+            <span className="text-slate-400 font-mono">
+              Showing {(currentPage - 1) * PAGE_SIZE + 1} - {Math.min(currentPage * PAGE_SIZE, filteredIpos.length)} of {filteredIpos.length} issues
+            </span>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Prev</span>
+              </button>
+              <span className="px-2 font-mono text-slate-400">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1"
+              >
+                <span>Next</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Section 2: Top GMP Gainers of the Week (Recent Active Issues with Dates) */}

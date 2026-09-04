@@ -6,12 +6,21 @@ import { IpoCard } from '../components/ipo/IpoCard';
 import { ScoreBreakdownModal } from '../components/common/ScoreBreakdownModal';
 import { IpoComparisonModal } from '../components/comparison/IpoComparisonModal';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { Flame, TrendingUp, Calendar, Layers, Activity, Sparkles, ArrowRight, ShieldCheck, Scale, Share2 } from 'lucide-react';
+import { Flame, TrendingUp, Calendar, Layers, Activity, Sparkles, ArrowRight, ShieldCheck, Scale, Share2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Pagination & Filter State for Upcoming and Listed sections
+  const [upcomingTab, setUpcomingTab] = useState<'ALL' | 'Mainboard' | 'Sme'>('ALL');
+  const [upcomingPage, setUpcomingPage] = useState(1);
+  const UPCOMING_PAGE_SIZE = 6;
+
+  const [listedTab, setListedTab] = useState<'ALL' | 'Mainboard' | 'Sme'>('ALL');
+  const [listedPage, setListedPage] = useState(1);
+  const LISTED_PAGE_SIZE = 8;
 
   // Scoring Breakdown Modal State
   const [selectedIpoForScore, setSelectedIpoForScore] = useState<IpoSummary | null>(null);
@@ -106,6 +115,22 @@ export const DashboardPage: React.FC = () => {
   const upcomingIpos = summary.upcomingIpos || [];
   const recentlyListedIpos = summary.recentlyListedIpos || [];
   const totalAnalyzed = summary.totalIposCount || (openIpos.length + upcomingIpos.length + recentlyListedIpos.length) || 30;
+
+  const filteredUpcoming = upcomingIpos.filter((ipo) => {
+    if (upcomingTab === 'Mainboard') return ipo.ipoType === 'Mainboard';
+    if (upcomingTab === 'Sme') return ipo.ipoType === 'Sme';
+    return true;
+  });
+  const totalUpcomingPages = Math.max(1, Math.ceil(filteredUpcoming.length / UPCOMING_PAGE_SIZE));
+  const pagedUpcoming = filteredUpcoming.slice((upcomingPage - 1) * UPCOMING_PAGE_SIZE, upcomingPage * UPCOMING_PAGE_SIZE);
+
+  const filteredListed = recentlyListedIpos.filter((ipo) => {
+    if (listedTab === 'Mainboard') return ipo.ipoType === 'Mainboard';
+    if (listedTab === 'Sme') return ipo.ipoType === 'Sme';
+    return true;
+  });
+  const totalListedPages = Math.max(1, Math.ceil(filteredListed.length / LISTED_PAGE_SIZE));
+  const pagedListed = filteredListed.slice((listedPage - 1) * LISTED_PAGE_SIZE, listedPage * LISTED_PAGE_SIZE);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
@@ -286,94 +311,220 @@ export const DashboardPage: React.FC = () => {
 
       {/* Section 2: Upcoming IPOs */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center space-x-2">
             <Calendar className="w-5 h-5 text-blue-400" />
             <h2 className="text-xl font-bold text-white tracking-tight">Upcoming Pipeline</h2>
           </div>
-          <Link to="/ipos?status=Upcoming" className="text-xs font-semibold text-blue-400 hover:underline">
-            View full pipeline →
-          </Link>
+
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs">
+              <button
+                onClick={() => { setUpcomingTab('ALL'); setUpcomingPage(1); }}
+                className={`px-3 py-1 rounded-lg font-semibold transition ${
+                  upcomingTab === 'ALL' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                All ({upcomingIpos.length})
+              </button>
+              <button
+                onClick={() => { setUpcomingTab('Mainboard'); setUpcomingPage(1); }}
+                className={`px-3 py-1 rounded-lg font-semibold transition ${
+                  upcomingTab === 'Mainboard' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Mainboard ({upcomingIpos.filter((i) => i.ipoType === 'Mainboard').length})
+              </button>
+              <button
+                onClick={() => { setUpcomingTab('Sme'); setUpcomingPage(1); }}
+                className={`px-3 py-1 rounded-lg font-semibold transition ${
+                  upcomingTab === 'Sme' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                SME ({upcomingIpos.filter((i) => i.ipoType === 'Sme').length})
+              </button>
+            </div>
+
+            <Link to="/ipos?status=Upcoming" className="text-xs font-semibold text-blue-400 hover:underline">
+              View full pipeline →
+            </Link>
+          </div>
         </div>
 
-        {upcomingIpos.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {upcomingIpos.map((ipo) => (
-              <IpoCard
-                key={ipo.id}
-                ipo={ipo}
-                onOpenScoreBreakdown={handleOpenScoreBreakdown}
-              />
-            ))}
-          </div>
+        {pagedUpcoming.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {pagedUpcoming.map((ipo) => (
+                <IpoCard
+                  key={ipo.id}
+                  ipo={ipo}
+                  onOpenScoreBreakdown={handleOpenScoreBreakdown}
+                />
+              ))}
+            </div>
+
+            {totalUpcomingPages > 1 && (
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 text-xs">
+                <span className="text-slate-400 font-mono">
+                  Showing {(upcomingPage - 1) * UPCOMING_PAGE_SIZE + 1} - {Math.min(upcomingPage * UPCOMING_PAGE_SIZE, filteredUpcoming.length)} of {filteredUpcoming.length} upcoming
+                </span>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setUpcomingPage((p) => Math.max(1, p - 1))}
+                    disabled={upcomingPage === 1}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Prev</span>
+                  </button>
+                  <span className="px-2 font-mono text-slate-400">
+                    {upcomingPage} / {totalUpcomingPages}
+                  </span>
+                  <button
+                    onClick={() => setUpcomingPage((p) => Math.min(totalUpcomingPages, p + 1))}
+                    disabled={upcomingPage === totalUpcomingPages}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <div className="p-8 text-center bg-slate-900/40 rounded-2xl border border-slate-800 text-xs text-slate-400">
-            No upcoming IPO announcements at this moment.
+            No upcoming IPO announcements matching selected filter.
           </div>
         )}
       </section>
 
       {/* Section 3: Recently Listed Issues */}
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center space-x-2">
             <ShieldCheck className="w-5 h-5 text-purple-400" />
             <h2 className="text-xl font-bold text-white tracking-tight">Recently Listed Historical Issues</h2>
           </div>
-          <Link to="/ipos?status=Listed" className="text-xs font-semibold text-purple-400 hover:underline">
-            View all listed IPOs →
-          </Link>
+
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs">
+              <button
+                onClick={() => { setListedTab('ALL'); setListedPage(1); }}
+                className={`px-3 py-1 rounded-lg font-semibold transition ${
+                  listedTab === 'ALL' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                All ({recentlyListedIpos.length})
+              </button>
+              <button
+                onClick={() => { setListedTab('Mainboard'); setListedPage(1); }}
+                className={`px-3 py-1 rounded-lg font-semibold transition ${
+                  listedTab === 'Mainboard' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Mainboard ({recentlyListedIpos.filter((i) => i.ipoType === 'Mainboard').length})
+              </button>
+              <button
+                onClick={() => { setListedTab('Sme'); setListedPage(1); }}
+                className={`px-3 py-1 rounded-lg font-semibold transition ${
+                  listedTab === 'Sme' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                SME ({recentlyListedIpos.filter((i) => i.ipoType === 'Sme').length})
+              </button>
+            </div>
+
+            <Link to="/ipos?status=Listed" className="text-xs font-semibold text-purple-400 hover:underline">
+              View all listed IPOs →
+            </Link>
+          </div>
         </div>
 
-        {recentlyListedIpos.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {recentlyListedIpos.map((ipo) => {
-              const listGain = ipo.actualListingGainPercent ?? ipo.listingGainPercent;
-              const listGainPerLot = ipo.actualListingGainPerLot ?? (ipo.priceBandHigh && ipo.listingPrice && ipo.lotSize ? (ipo.listingPrice - ipo.priceBandHigh) * ipo.lotSize : null);
-              const listPrice = ipo.actualListingPrice ?? ipo.listingPrice;
-              const issuePrice = ipo.priceBandHigh || ipo.issuePrice;
-              return (
-                <Link
-                  key={ipo.id}
-                  to={`/ipos/${ipo.id}`}
-                  className="glass-panel p-4 rounded-2xl border border-slate-800 hover:border-slate-700 bg-slate-900/60 hover:bg-slate-900 transition flex flex-col justify-between group"
-                >
-                  <div>
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
-                      <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">{ipo.ipoType}</span>
-                      <span className="font-mono text-[10px] text-slate-400">Listed: {ipo.listingDate ? new Date(ipo.listingDate).toLocaleDateString('en-IN') : '-'}</span>
-                    </div>
-                    <h4 className="font-bold text-white text-sm group-hover:text-emerald-400 transition truncate">
-                      {ipo.name}
-                    </h4>
-                    <div className="text-xs text-slate-400 mt-0.5 flex items-center justify-between">
-                      <span>{ipo.sector}</span>
-                      <span className="text-slate-500 font-mono text-[10px]">Issue: ₹{issuePrice || '-'}</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
+        {pagedListed.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {pagedListed.map((ipo) => {
+                const listGain = ipo.actualListingGainPercent ?? ipo.listingGainPercent;
+                const listGainPerLot = ipo.actualListingGainPerLot ?? (ipo.priceBandHigh && ipo.listingPrice && ipo.lotSize ? (ipo.listingPrice - ipo.priceBandHigh) * ipo.lotSize : null);
+                const listPrice = ipo.actualListingPrice ?? ipo.listingPrice;
+                const issuePrice = ipo.priceBandHigh || ipo.issuePrice;
+                return (
+                  <Link
+                    key={ipo.id}
+                    to={`/ipos/${ipo.id}`}
+                    className="glass-panel p-4 rounded-2xl border border-slate-800 hover:border-slate-700 bg-slate-900/60 hover:bg-slate-900 transition flex flex-col justify-between group"
+                  >
                     <div>
-                      <span className="text-[10px] text-emerald-400 font-semibold uppercase block">Exact Listing Gain</span>
-                      <span className="font-mono font-bold text-emerald-400 text-sm">
-                        {listGain !== undefined ? `+${listGain}%` : '-'}
-                      </span>
-                      {listGainPerLot && (
-                        <span className="text-[10px] text-emerald-500 block font-mono">
-                          +₹{listGainPerLot.toLocaleString('en-IN')}/lot
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
+                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[10px]">{ipo.ipoType}</span>
+                        <span className="font-mono text-[10px] text-slate-400">Listed: {ipo.listingDate ? new Date(ipo.listingDate).toLocaleDateString('en-IN') : '-'}</span>
+                      </div>
+                      <h4 className="font-bold text-white text-sm group-hover:text-emerald-400 transition truncate">
+                        {ipo.name}
+                      </h4>
+                      <div className="text-xs text-slate-400 mt-0.5 flex items-center justify-between">
+                        <span>{ipo.sector}</span>
+                        <span className="text-slate-500 font-mono text-[10px]">Issue: ₹{issuePrice || '-'}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-emerald-400 font-semibold uppercase block">Exact Listing Gain</span>
+                        <span className="font-mono font-bold text-emerald-400 text-sm">
+                          {listGain !== undefined ? `+${listGain}%` : '-'}
                         </span>
-                      )}
+                        {listGainPerLot && (
+                          <span className="text-[10px] text-emerald-500 block font-mono">
+                            +₹{listGainPerLot.toLocaleString('en-IN')}/lot
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 uppercase block">Debut Price</span>
+                        <span className="font-mono font-bold text-white text-sm">
+                          {listPrice ? `₹${listPrice}` : '-'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 uppercase block">Debut Price</span>
-                      <span className="font-mono font-bold text-white text-sm">
-                        {listPrice ? `₹${listPrice}` : '-'}
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+                  </Link>
+                );
+              })}
+            </div>
+
+            {totalListedPages > 1 && (
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 text-xs">
+                <span className="text-slate-400 font-mono">
+                  Showing {(listedPage - 1) * LISTED_PAGE_SIZE + 1} - {Math.min(listedPage * LISTED_PAGE_SIZE, filteredListed.length)} of {filteredListed.length} listed
+                </span>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setListedPage((p) => Math.max(1, p - 1))}
+                    disabled={listedPage === 1}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Prev</span>
+                  </button>
+                  <span className="px-2 font-mono text-slate-400">
+                    {listedPage} / {totalListedPages}
+                  </span>
+                  <button
+                    onClick={() => setListedPage((p) => Math.min(totalListedPages, p + 1))}
+                    disabled={listedPage === totalListedPages}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="p-8 text-center bg-slate-900/40 rounded-2xl border border-slate-800 text-xs text-slate-400">
+            No listed issues matching selected filter.
           </div>
         )}
       </section>

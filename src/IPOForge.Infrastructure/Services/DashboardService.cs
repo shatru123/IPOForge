@@ -101,7 +101,7 @@ public class DashboardService : IDashboardService
             AverageSubscriptionX = avgSub,
             AverageListingGainPercent = avgGain,
             OpenIpos = open,
-            UpcomingIpos = upcoming,
+            UpcomingIpos = upcoming.Take(12).ToList(),
             ClosingTodayIpos = closingToday,
             RecentlyListedIpos = listed.Take(8).ToList(),
             TopGmpGainers = topGainers,

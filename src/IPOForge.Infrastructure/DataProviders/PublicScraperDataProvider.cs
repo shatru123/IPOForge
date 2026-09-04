@@ -136,10 +136,10 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
             foreach (var row in rows)
             {
                 var cells = row.SelectNodes("td|th");
-                if (cells == null || cells.Count < 7) continue;
+                if (cells == null || cells.Count < 4) continue;
 
                 var cellTexts = cells.Select(c => c.InnerText.Trim()).ToList();
-                if (cellTexts[0].Equals("IPO Name", StringComparison.OrdinalIgnoreCase))
+                if (cellTexts[0].Equals("IPO Name", StringComparison.OrdinalIgnoreCase) || cellTexts[0].Equals("Company", StringComparison.OrdinalIgnoreCase))
                 {
                     if (ipoList.Count > 0) isSmeSection = true;
                     continue;
@@ -147,10 +147,28 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
 
                 var rawName = cellTexts[0];
                 var rawGmp = cellTexts[1];
-                var rawPrice = cellTexts[3];
-                var rawEst = cellTexts[4];
-                var rawDate = cellTexts[5];
-                var rawStatus = cellTexts[6];
+                string rawPrice = "";
+                string rawEst = "";
+                string rawDate = "";
+                string rawStatus = "";
+
+                if (cells.Count >= 7)
+                {
+                    rawGmp = cellTexts[1];
+                    rawPrice = cellTexts[3];
+                    rawEst = cellTexts[4];
+                    rawDate = cellTexts[5];
+                    rawStatus = cellTexts[6];
+                }
+                else
+                {
+                    // 4 columns: [0]=Name, [1]=IPO Price, [2]=GMP, [3]=Listing Price
+                    rawPrice = cellTexts[1];
+                    rawGmp = cellTexts[2];
+                    rawEst = cellTexts[3];
+                    rawDate = cellTexts[3];
+                    rawStatus = "Listed";
+                }
 
                 var linkNode = cells[0].SelectSingleNode(".//a");
                 var detailUrl = linkNode?.GetAttributeValue("href", null)?.Trim();
@@ -169,9 +187,11 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
                 else if (priceMatches.Count == 1) { decimal.TryParse(priceMatches[0].Value, out priceHigh); priceLow = priceHigh; }
 
                 decimal gmpPercent = 0;
-                var gainMatch = Regex.Match(rawEst, @"[\d.]+(?=%)");
+                var gainMatch = Regex.Match(rawGmp + " " + rawEst, @"[\d.]+(?=%)");
                 if (gainMatch.Success && decimal.TryParse(gainMatch.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsedPct)) gmpPercent = parsedPct;
                 else if (priceHigh > 0 && gmpVal > 0) gmpPercent = Math.Round((gmpVal / priceHigh) * 100, 2);
+
+                decimal.TryParse(Regex.Replace(rawEst, @"[^\d.]", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out var listingPrice);
 
                 var status = IpoStatus.Upcoming;
                 if (rawStatus.Contains("Open", StringComparison.OrdinalIgnoreCase)) status = IpoStatus.Open;
@@ -180,15 +200,24 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
                 else if (rawStatus.Contains("Allot", StringComparison.OrdinalIgnoreCase)) status = IpoStatus.Allotted;
 
                 var (openDate, closeDate) = ParseDateRange(rawDate, currentYear, status);
-                var allotmentDate = closeDate.AddDays(2);
-                var listingDate = closeDate.AddDays(5);
+                DateTime? allotmentDate = closeDate?.AddDays(2);
+                DateTime? listingDate = closeDate?.AddDays(5);
 
                 var todayUtc = DateTime.UtcNow.Date;
                 if (status != IpoStatus.Listed)
                 {
-                    if (closeDate.Date <= todayUtc) status = IpoStatus.Closed;
-                    else if (openDate.Date > todayUtc) status = IpoStatus.Upcoming;
-                    else if (openDate.Date <= todayUtc && closeDate.Date > todayUtc) status = IpoStatus.Open;
+                    if (closeDate.HasValue && closeDate.Value.Date < todayUtc)
+                    {
+                        status = IpoStatus.Closed;
+                    }
+                    else if (openDate.HasValue && closeDate.HasValue && openDate.Value.Date <= todayUtc && closeDate.Value.Date >= todayUtc)
+                    {
+                        status = IpoStatus.Open;
+                    }
+                    else
+                    {
+                        status = IpoStatus.Upcoming;
+                    }
                 }
 
                 var (sector, industry) = InferSector(cleanName);
@@ -243,6 +272,8 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
                     FaceValue = 10,
                     Exchange = isSme ? "NSE SME / BSE SME" : "NSE / BSE",
                     Registrar = "Link Intime / KFin Technologies",
+                    ListingPrice = status == IpoStatus.Listed && listingPrice > 0 ? listingPrice : null,
+                    ListingGainPercent = status == IpoStatus.Listed ? (priceHigh > 0 && listingPrice > 0 ? Math.Round(((listingPrice - priceHigh) / priceHigh) * 100, 2) : (gmpPercent > 0 ? gmpPercent : null)) : null,
                     CreatedAt = now,
                     UpdatedAt = now
                 };
@@ -366,8 +397,8 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
                     Status = IpoStatus.Upcoming,
                     OpenDate = openDate,
                     CloseDate = closeDate,
-                    AllotmentDate = closeDate.AddDays(2),
-                    ListingDate = closeDate.AddDays(5),
+                    AllotmentDate = closeDate?.AddDays(2),
+                    ListingDate = closeDate?.AddDays(5),
                     PriceBandLow = priceLow > 0 ? priceLow : 100,
                     PriceBandHigh = priceHigh > 0 ? priceHigh : 100,
                     LotSize = priceHigh > 0 ? Math.Max(15, (int)(15000 / priceHigh)) : 30,
@@ -417,7 +448,7 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
                 var rawClose = cellTexts[2];
                 var rawSize = cellTexts[3];
                 var rawPrice = cellTexts[4];
-                var rawGmp = cellTexts[5];
+                var rawListingDate = cells.Count >= 6 ? cellTexts[5] : "";
                 var rawListPrice = cells.Count >= 7 ? cellTexts[6] : "";
                 var rawGain = cells.Count >= 8 ? cellTexts[7] : "";
 
@@ -432,14 +463,16 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
                 if (priceMatches.Count >= 2) { decimal.TryParse(priceMatches[0].Value, out priceLow); decimal.TryParse(priceMatches[1].Value, out priceHigh); }
                 else if (priceMatches.Count == 1) { decimal.TryParse(priceMatches[0].Value, out priceHigh); priceLow = priceHigh; }
 
-                decimal.TryParse(Regex.Replace(rawGmp, @"[^\d.]", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out var gmpVal);
                 decimal.TryParse(Regex.Replace(rawListPrice, @"[^\d.]", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out var listingPrice);
                 decimal.TryParse(Regex.Replace(rawGain, @"[^\d.-]", ""), NumberStyles.Any, CultureInfo.InvariantCulture, out var gainPct);
 
                 DateTime? openDate = ParseSingleDate(rawOpen);
                 DateTime? closeDate = ParseSingleDate(rawClose);
+                DateTime? parsedListingDate = ParseSingleDate(rawListingDate);
+                DateTime? listingDate = parsedListingDate ?? closeDate?.AddDays(5);
+
                 var todayUtc = DateTime.UtcNow.Date;
-                var isListed = listingPrice > 0 || (closeDate.HasValue && closeDate.Value.Date < todayUtc.AddDays(-7));
+                var isListed = listingPrice > 0 || (parsedListingDate.HasValue && parsedListingDate.Value.Date <= todayUtc) || (closeDate.HasValue && closeDate.Value.Date < todayUtc.AddDays(-7));
 
                 if (listedOnly && !isListed) continue;
                 if (!listedOnly && isListed) continue;
@@ -471,10 +504,10 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
                     Symbol = GenerateSymbol(cleanName),
                     IpoType = IpoType.Sme,
                     Status = status,
-                    OpenDate = openDate ?? now.AddDays(3),
-                    CloseDate = closeDate ?? now.AddDays(6),
-                    AllotmentDate = (closeDate ?? now.AddDays(6)).AddDays(2),
-                    ListingDate = (closeDate ?? now.AddDays(6)).AddDays(5),
+                    OpenDate = openDate,
+                    CloseDate = closeDate,
+                    AllotmentDate = closeDate?.AddDays(2),
+                    ListingDate = listingDate,
                     PriceBandLow = priceLow > 0 ? priceLow : 80,
                     PriceBandHigh = priceHigh > 0 ? priceHigh : 80,
                     LotSize = priceHigh > 0 ? (int)(120000 / priceHigh) : 1200,
@@ -486,27 +519,12 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
                     Exchange = "NSE SME / BSE SME",
                     Registrar = "Link Intime / Bigshare / Skyline",
                     ListingPrice = listingPrice > 0 ? listingPrice : null,
-                    ListingGainPercent = gainPct != 0 ? gainPct : null,
+                    ListingGainPercent = gainPct != 0 ? gainPct : (priceHigh > 0 && listingPrice > 0 ? Math.Round(((listingPrice - priceHigh) / priceHigh) * 100, 2) : null),
                     CreatedAt = now,
                     UpdatedAt = now
                 };
 
-                if (gmpVal > 0)
-                {
-                    ipo.GmpHistories.Add(new IPOGmpHistory
-                    {
-                        Id = Guid.NewGuid(),
-                        IpoId = ipo.Id,
-                        GMP = gmpVal,
-                        GMPPercentage = priceHigh > 0 ? Math.Round((gmpVal / priceHigh) * 100, 2) : 0,
-                        EstimatedListingPrice = priceHigh + gmpVal,
-                        Source = "Live SME Market Feed",
-                        ObservedAt = now,
-                        RetrievedAt = now
-                    });
-                }
-
-                CalculateDynamicScores(ipo, priceHigh > 0 && gmpVal > 0 ? Math.Round((gmpVal / priceHigh) * 100, 2) : gainPct, true, issueSize, cleanName, status, now);
+                CalculateDynamicScores(ipo, gainPct, true, issueSize, cleanName, status, now);
                 list.Add(ipo);
             }
         }
@@ -603,27 +621,153 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
         return ipoList;
     }
 
-    private static (DateTime Open, DateTime Close) ParseDateRange(string rawDate, int currentYear, IpoStatus status)
+    private static (DateTime? Open, DateTime? Close) ParseDateRange(string rawDate, int currentYear, IpoStatus status)
     {
-        DateTime? openDate = null, closeDate = null;
-        var matchTwoMonth = Regex.Match(rawDate, @"(\d+)\s*([A-Za-z]+)\s*-\s*(\d+)\s*([A-Za-z]+)");
-        if (matchTwoMonth.Success)
+        if (string.IsNullOrWhiteSpace(rawDate))
+            return (null, null);
+
+        var cleaned = rawDate.Replace("\u00a0", " ").Trim();
+        if (cleaned.Equals("TBA", StringComparison.OrdinalIgnoreCase) ||
+            cleaned.Equals("TBD", StringComparison.OrdinalIgnoreCase) ||
+            cleaned.Equals("Coming Soon", StringComparison.OrdinalIgnoreCase) ||
+            cleaned.Equals("-") ||
+            Regex.IsMatch(cleaned, @"^\d{4}$"))
         {
-            if (MonthLookup.TryGetValue(matchTwoMonth.Groups[2].Value, out int m1) && MonthLookup.TryGetValue(matchTwoMonth.Groups[4].Value, out int m2))
+            return (null, null);
+        }
+
+        DateTime? openDate = null;
+        DateTime? closeDate = null;
+
+        // 1. "28 Aug - 1 Sept 2026" or "28 Aug - 1 Sept" or "28 August - 1 September"
+        var matchTwoMonthEnd = Regex.Match(cleaned, @"(\d{1,2})\s*([A-Za-z]+)\s*-\s*(\d{1,2})\s*([A-Za-z]+)(?:\s+(\d{4}))?", RegexOptions.IgnoreCase);
+        if (matchTwoMonthEnd.Success)
+        {
+            var yr = matchTwoMonthEnd.Groups[5].Success && int.TryParse(matchTwoMonthEnd.Groups[5].Value, out var y) ? y : currentYear;
+            if (MonthLookup.TryGetValue(matchTwoMonthEnd.Groups[2].Value, out int m1) &&
+                MonthLookup.TryGetValue(matchTwoMonthEnd.Groups[4].Value, out int m2))
             {
-                openDate = new DateTime(currentYear, m1, int.Parse(matchTwoMonth.Groups[1].Value), 10, 0, 0, DateTimeKind.Utc);
-                closeDate = new DateTime(currentYear, m2, int.Parse(matchTwoMonth.Groups[3].Value), 17, 0, 0, DateTimeKind.Utc);
+                int d1 = int.Parse(matchTwoMonthEnd.Groups[1].Value);
+                int d2 = int.Parse(matchTwoMonthEnd.Groups[3].Value);
+                int y1 = (m1 == 12 && m2 == 1) ? yr - 1 : yr;
+                if (d1 >= 1 && d1 <= DateTime.DaysInMonth(y1, m1) && d2 >= 1 && d2 <= DateTime.DaysInMonth(yr, m2))
+                {
+                    openDate = new DateTime(y1, m1, d1, 10, 0, 0, DateTimeKind.Utc);
+                    closeDate = new DateTime(yr, m2, d2, 17, 0, 0, DateTimeKind.Utc);
+                    return (openDate, closeDate);
+                }
             }
         }
-        openDate ??= DateTime.UtcNow.AddDays(status == IpoStatus.Open ? -1 : 3);
-        closeDate ??= DateTime.UtcNow.AddDays(status == IpoStatus.Open ? 2 : 6);
-        return (openDate.Value, closeDate.Value);
+
+        // 2. "21-23 September 2026" or "10-15 Sept" or "4-8 Sep" or "1-3 September" or "31-2 September"
+        var matchDayRangeMonth = Regex.Match(cleaned, @"(\d{1,2})\s*-\s*(\d{1,2})\s+([A-Za-z]+)(?:\s+(\d{4}))?", RegexOptions.IgnoreCase);
+        if (matchDayRangeMonth.Success)
+        {
+            var yr = matchDayRangeMonth.Groups[4].Success && int.TryParse(matchDayRangeMonth.Groups[4].Value, out var y) ? y : currentYear;
+            if (MonthLookup.TryGetValue(matchDayRangeMonth.Groups[3].Value, out int m))
+            {
+                int d1 = int.Parse(matchDayRangeMonth.Groups[1].Value);
+                int d2 = int.Parse(matchDayRangeMonth.Groups[2].Value);
+                if (d1 > d2)
+                {
+                    int prevMonth = m == 1 ? 12 : m - 1;
+                    int prevYear = m == 1 ? yr - 1 : yr;
+                    if (d1 >= 1 && d1 <= DateTime.DaysInMonth(prevYear, prevMonth) && d2 >= 1 && d2 <= DateTime.DaysInMonth(yr, m))
+                    {
+                        openDate = new DateTime(prevYear, prevMonth, d1, 10, 0, 0, DateTimeKind.Utc);
+                        closeDate = new DateTime(yr, m, d2, 17, 0, 0, DateTimeKind.Utc);
+                        return (openDate, closeDate);
+                    }
+                }
+                else
+                {
+                    if (d1 >= 1 && d1 <= DateTime.DaysInMonth(yr, m) && d2 >= 1 && d2 <= DateTime.DaysInMonth(yr, m))
+                    {
+                        openDate = new DateTime(yr, m, d1, 10, 0, 0, DateTimeKind.Utc);
+                        closeDate = new DateTime(yr, m, d2, 17, 0, 0, DateTimeKind.Utc);
+                        return (openDate, closeDate);
+                    }
+                }
+            }
+        }
+
+        // 3. "Aug 19-21, 2026" or "Sept 10-15" or "September 21-23"
+        var matchMonthFirstRange = Regex.Match(cleaned, @"([A-Za-z]+)\s*(\d{1,2})\s*-\s*(\d{1,2})(?:,\s*(\d{4}))?", RegexOptions.IgnoreCase);
+        if (matchMonthFirstRange.Success)
+        {
+            var yr = matchMonthFirstRange.Groups[4].Success && int.TryParse(matchMonthFirstRange.Groups[4].Value, out var y) ? y : currentYear;
+            if (MonthLookup.TryGetValue(matchMonthFirstRange.Groups[1].Value, out int m))
+            {
+                int d1 = int.Parse(matchMonthFirstRange.Groups[2].Value);
+                int d2 = int.Parse(matchMonthFirstRange.Groups[3].Value);
+                if (d1 >= 1 && d1 <= DateTime.DaysInMonth(yr, m) && d2 >= 1 && d2 <= DateTime.DaysInMonth(yr, m))
+                {
+                    openDate = new DateTime(yr, m, d1, 10, 0, 0, DateTimeKind.Utc);
+                    closeDate = new DateTime(yr, m, d2, 17, 0, 0, DateTimeKind.Utc);
+                    return (openDate, closeDate);
+                }
+            }
+        }
+
+        // 4. "Aug 28 - Sep 1, 2026" or "August 28 - September 1"
+        var matchMonthDayMonthDay = Regex.Match(cleaned, @"([A-Za-z]+)\s*(\d{1,2})\s*-\s*([A-Za-z]+)\s*(\d{1,2})(?:,\s*(\d{4}))?", RegexOptions.IgnoreCase);
+        if (matchMonthDayMonthDay.Success)
+        {
+            var yr = matchMonthDayMonthDay.Groups[5].Success && int.TryParse(matchMonthDayMonthDay.Groups[5].Value, out var y) ? y : currentYear;
+            if (MonthLookup.TryGetValue(matchMonthDayMonthDay.Groups[1].Value, out int m1) &&
+                MonthLookup.TryGetValue(matchMonthDayMonthDay.Groups[3].Value, out int m2))
+            {
+                int d1 = int.Parse(matchMonthDayMonthDay.Groups[2].Value);
+                int d2 = int.Parse(matchMonthDayMonthDay.Groups[4].Value);
+                int y1 = (m1 == 12 && m2 == 1) ? yr - 1 : yr;
+                if (d1 >= 1 && d1 <= DateTime.DaysInMonth(y1, m1) && d2 >= 1 && d2 <= DateTime.DaysInMonth(yr, m2))
+                {
+                    openDate = new DateTime(y1, m1, d1, 10, 0, 0, DateTimeKind.Utc);
+                    closeDate = new DateTime(yr, m2, d2, 17, 0, 0, DateTimeKind.Utc);
+                    return (openDate, closeDate);
+                }
+            }
+        }
+
+        // 5. Single Date "Dec 31, 2025" or "31 Dec 2025" or "15 September"
+        var singleDt = ParseSingleDate(cleaned);
+        if (singleDt.HasValue)
+        {
+            return (singleDt.Value, singleDt.Value.AddDays(3));
+        }
+
+        return (null, null);
     }
 
     private static DateTime? ParseSingleDate(string raw)
     {
-        var mFull = Regex.Match(raw, @"([A-Za-z]+)\s*(\d{1,2}),\s*(\d{4})");
-        return mFull.Success && DateTime.TryParse(mFull.Value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt) ? DateTime.SpecifyKind(dt, DateTimeKind.Utc) : null;
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var cleaned = raw.Replace("\u00a0", " ").Trim();
+
+        // Match "Dec 31, 2025" or "December 31, 2025" or "Dec 31 2025"
+        var m1 = Regex.Match(cleaned, @"([A-Za-z]+)\s*(\d{1,2})(?:,\s*|\s+)(\d{4})?", RegexOptions.IgnoreCase);
+        if (m1.Success && MonthLookup.TryGetValue(m1.Groups[1].Value, out int m))
+        {
+            int d = int.Parse(m1.Groups[2].Value);
+            int yr = m1.Groups[3].Success && int.TryParse(m1.Groups[3].Value, out var y) ? y : DateTime.UtcNow.Year;
+            if (d >= 1 && d <= DateTime.DaysInMonth(yr, m))
+                return new DateTime(yr, m, d, 10, 0, 0, DateTimeKind.Utc);
+        }
+
+        // Match "31 Dec 2025" or "31 December 2025" or "31 Dec"
+        var m2 = Regex.Match(cleaned, @"(\d{1,2})\s+([A-Za-z]+)(?:\s+(\d{4}))?", RegexOptions.IgnoreCase);
+        if (m2.Success && MonthLookup.TryGetValue(m2.Groups[2].Value, out int mVal))
+        {
+            int d = int.Parse(m2.Groups[1].Value);
+            int yr = m2.Groups[3].Success && int.TryParse(m2.Groups[3].Value, out var y) ? y : DateTime.UtcNow.Year;
+            if (d >= 1 && d <= DateTime.DaysInMonth(yr, mVal))
+                return new DateTime(yr, mVal, d, 10, 0, 0, DateTimeKind.Utc);
+        }
+
+        if (DateTime.TryParse(cleaned, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+            return DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+
+        return null;
     }
 
     private static string CleanCompanyName(string raw) => Regex.Replace(raw, @"\b(SME|IPO|Limited|Ltd)\b", "", RegexOptions.IgnoreCase).Replace("\u00a0", " ").Trim();
