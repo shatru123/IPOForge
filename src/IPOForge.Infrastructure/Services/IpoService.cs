@@ -248,9 +248,9 @@ public class IpoService : IIpoService
             .Include(i => i.GmpHistories)
             .Include(i => i.Scores)
             .Where(i => i.Name.ToLower().Contains(s) ||
-                        i.Symbol.ToLower().Contains(s) ||
+                        (i.Symbol != null && i.Symbol.ToLower().Contains(s)) ||
                         i.Company.Name.ToLower().Contains(s) ||
-                        i.Company.Sector.ToLower().Contains(s))
+                        (i.Company.Sector != null && i.Company.Sector.ToLower().Contains(s)))
             .Take(10)
             .ToListAsync(cancellationToken);
 
