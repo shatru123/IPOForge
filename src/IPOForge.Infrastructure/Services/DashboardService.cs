@@ -103,7 +103,7 @@ public class DashboardService : IDashboardService
             OpenIpos = open,
             UpcomingIpos = upcoming,
             ClosingTodayIpos = closingToday,
-            RecentlyListedIpos = listed.Take(6).ToList(),
+            RecentlyListedIpos = listed.Take(8).ToList(),
             TopGmpGainers = topGainers,
             TopGmpLosers = topLosers,
             HighPotentialListingIpos = highPotentialListing,

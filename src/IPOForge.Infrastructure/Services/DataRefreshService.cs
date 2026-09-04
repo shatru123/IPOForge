@@ -60,8 +60,10 @@ public class DataRefreshService : IDataRefreshService
         {
             _logger.LogInformation("Starting live real-time Indian IPO market data sync...");
 
-            // 1. Fetch live real IPOs from public market aggregator
+            // 1. Fetch live real IPOs and real listed performance from public market aggregators
             var liveIpos = await _publicScraper.FetchRealLiveIposAsync(cancellationToken);
+            var listedIpos = await _publicScraper.FetchRealListedIposAsync(cancellationToken);
+            var allScrapedIpos = liveIpos.Concat(listedIpos).ToList();
 
             var existingIpos = await _context.IPOs
                 .Include(i => i.Company).ThenInclude(c => c.Financials)
@@ -74,8 +76,8 @@ public class DataRefreshService : IDataRefreshService
 
             var industryMetrics = await _context.IndustryMetrics.ToListAsync(cancellationToken);
 
-            // 2. Ingest or update live IPOs
-            foreach (var liveIpo in liveIpos)
+            // 2. Ingest or update live and listed IPOs
+            foreach (var liveIpo in allScrapedIpos)
             {
                 var match = existingIpos.FirstOrDefault(e =>
                     e.Name.Equals(liveIpo.Name, StringComparison.OrdinalIgnoreCase) ||
@@ -96,6 +98,12 @@ public class DataRefreshService : IDataRefreshService
                     match.CloseDate = liveIpo.CloseDate ?? match.CloseDate;
                     match.AllotmentDate = liveIpo.AllotmentDate ?? match.AllotmentDate;
                     match.ListingDate = liveIpo.ListingDate ?? match.ListingDate;
+                    if (liveIpo.Status == IpoStatus.Listed)
+                    {
+                        match.ListingPrice = liveIpo.ListingPrice ?? match.ListingPrice;
+                        match.ListingGainPercent = liveIpo.ListingGainPercent ?? match.ListingGainPercent;
+                        match.Day1ClosePrice = liveIpo.Day1ClosePrice ?? match.Day1ClosePrice;
+                    }
                     match.UpdatedAt = DateTime.UtcNow;
 
                     var latestGmp = liveIpo.GmpHistories.LastOrDefault();
