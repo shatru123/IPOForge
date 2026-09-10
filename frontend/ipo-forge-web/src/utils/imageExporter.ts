@@ -134,15 +134,127 @@ export function evaluateComparison(ipos: IpoSummary[]): ComparisonDecision {
   };
 }
 
+export function inferRating(score: number): string {
+  if (score >= 80) return 'Strong';
+  if (score >= 65) return 'Positive';
+  if (score >= 50) return 'Neutral';
+  if (score >= 35) return 'Weak';
+  return 'Avoid';
+}
+
+function drawScoreGauge(
+  ctx: CanvasRenderingContext2D,
+  centerX: number,
+  centerY: number,
+  radius: number,
+  score: number,
+  label: string,
+  rating: string
+): void {
+  const safeScore = Math.min(100, Math.max(0, Math.round(score || 0)));
+  const strokeWidth = 5.5;
+
+  let strokeColor = '#EF4444'; // Avoid (0-34)
+  let badgeBg = 'rgba(239, 68, 68, 0.15)';
+  let badgeBorder = 'rgba(239, 68, 68, 0.4)';
+  let textColor = '#F87171';
+
+  if (safeScore >= 80) {
+    strokeColor = '#10B981'; // Strong (80-100)
+    badgeBg = 'rgba(16, 185, 129, 0.15)';
+    badgeBorder = 'rgba(16, 185, 129, 0.4)';
+    textColor = '#34D399';
+  } else if (safeScore >= 65) {
+    strokeColor = '#22C55E'; // Positive (65-79)
+    badgeBg = 'rgba(34, 197, 94, 0.15)';
+    badgeBorder = 'rgba(34, 197, 94, 0.4)';
+    textColor = '#4ADE80';
+  } else if (safeScore >= 50) {
+    strokeColor = '#EAB308'; // Neutral (50-64)
+    badgeBg = 'rgba(234, 179, 8, 0.15)';
+    badgeBorder = 'rgba(234, 179, 8, 0.4)';
+    textColor = '#FBBF24';
+  } else if (safeScore >= 35) {
+    strokeColor = '#F97316'; // Weak (35-49)
+    badgeBg = 'rgba(249, 115, 22, 0.15)';
+    badgeBorder = 'rgba(249, 115, 22, 0.4)';
+    textColor = '#FB923C';
+  }
+
+  // 1. Background Circle Track
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+  ctx.strokeStyle = '#1E293B';
+  ctx.lineWidth = strokeWidth;
+  ctx.stroke();
+
+  // 2. Progress Arc
+  if (safeScore > 0) {
+    const startAngle = -Math.PI / 2;
+    const endAngle = startAngle + (safeScore / 100) * 2 * Math.PI;
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = strokeWidth;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  }
+
+  // 3. Center Score Display
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(`${safeScore}`, centerX, centerY - 5);
+
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = 'bold 8.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.fillText('/ 100', centerX, centerY + 9);
+
+  // 4. Label below ring
+  ctx.fillStyle = '#CBD5E1';
+  ctx.font = 'bold 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(label, centerX, centerY + radius + 14);
+
+  // 5. Rating Badge Pill
+  if (rating) {
+    const badgeText = rating.toUpperCase();
+    ctx.font = 'bold 8.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    const textWidth = ctx.measureText(badgeText).width;
+    const pillW = textWidth + 12;
+    const pillH = 15;
+    const pillX = centerX - pillW / 2;
+    const pillY = centerY + radius + 22;
+
+    ctx.fillStyle = badgeBg;
+    ctx.strokeStyle = badgeBorder;
+    ctx.lineWidth = 1;
+    roundRect(ctx, pillX, pillY, pillW, pillH, 7);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = textColor;
+    ctx.fillText(badgeText, centerX, pillY + pillH / 2 + 0.5);
+  }
+
+  // Reset text alignment
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+}
+
 export async function generateComparisonImage(ipos: IpoSummary[]): Promise<string> {
   const decision = evaluateComparison(ipos);
   const count = ipos.length;
 
-  const width = Math.max(1000, count * 340 + 80);
-  const height = 800;
+  const isSingle = count === 1;
+  const cardWidth = isSingle ? 480 : 360;
+  const width = isSingle ? 560 : Math.max(1040, count * (cardWidth + 24) + 56);
+  const height = 860;
 
   const canvas = document.createElement('canvas');
-  const dpr = 2; // High-DPI Retina
+  const dpr = 2; // High-DPI Retina for ultra crisp output
   canvas.width = width * dpr;
   canvas.height = height * dpr;
   const ctx = canvas.getContext('2d');
@@ -152,15 +264,15 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
 
   // 1. Background Gradient
   const bgGradient = ctx.createLinearGradient(0, 0, width, height);
-  bgGradient.addColorStop(0, '#090D16');
+  bgGradient.addColorStop(0, '#070B14');
   bgGradient.addColorStop(0.5, '#0F172A');
   bgGradient.addColorStop(1, '#020617');
   ctx.fillStyle = bgGradient;
   ctx.fillRect(0, 0, width, height);
 
   // Subtle ambient glow
-  const glow = ctx.createRadialGradient(width / 2, 80, 20, width / 2, 80, 400);
-  glow.addColorStop(0, 'rgba(16, 185, 129, 0.15)');
+  const glow = ctx.createRadialGradient(width / 2, 70, 20, width / 2, 70, 420);
+  glow.addColorStop(0, 'rgba(16, 185, 129, 0.16)');
   glow.addColorStop(1, 'rgba(16, 185, 129, 0)');
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, width, height);
@@ -172,56 +284,57 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
 
   // 2. Header Branding
   ctx.fillStyle = '#10B981';
-  ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-  ctx.fillText('⚡ IPOFORGE INTELLIGENCE — REAL-TIME IPO DECISION ENGINE', 40, 48);
+  ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.fillText('⚡ IPOFORGE INTELLIGENCE — REAL-TIME IPO DECISION ENGINE', 36, 42);
 
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-  ctx.fillText('IPO Comparison: Which is Better to Apply?', 40, 80);
+  ctx.font = 'bold 22px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  const headerTitle = isSingle 
+    ? `${ipos[0].name} — 30-Second Quantitative Analysis`
+    : 'IPO Decision Matrix: Which is Better to Apply?';
+  ctx.fillText(headerTitle, 36, 72);
 
-  // Winner Callout Box
-  if (decision.hasActiveCandidates) {
-    const boxX = width - 420;
-    const boxY = 32;
-    const boxW = 380;
-    const boxH = 68;
+  // Winner Callout Box (when multiple IPOs)
+  if (!isSingle && decision.hasActiveCandidates) {
+    const boxX = width - 400;
+    const boxY = 26;
+    const boxW = 364;
+    const boxH = 58;
 
     ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
     ctx.strokeStyle = 'rgba(16, 185, 129, 0.4)';
     ctx.lineWidth = 1.5;
-    roundRect(ctx, boxX, boxY, boxW, boxH, 10);
+    roundRect(ctx, boxX, boxY, boxW, boxH, 8);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#F59E0B';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.fillText(`🏆 #1 TOP PICK: ${decision.winnerName}`, boxX + 14, boxY + 24);
+    ctx.font = 'bold 11.5px sans-serif';
+    ctx.fillText(`🏆 #1 TOP PICK: ${decision.winnerName}`, boxX + 12, boxY + 22);
 
     ctx.fillStyle = '#CBD5E1';
-    ctx.font = '11px sans-serif';
-    ctx.fillText(decision.reason.length > 55 ? decision.reason.slice(0, 52) + '...' : decision.reason, boxX + 14, boxY + 46);
+    ctx.font = '10.5px sans-serif';
+    ctx.fillText(decision.reason.length > 50 ? decision.reason.slice(0, 48) + '...' : decision.reason, boxX + 12, boxY + 42);
   }
 
   // Divider
   ctx.strokeStyle = '#334155';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(40, 115);
-  ctx.lineTo(width - 40, 115);
+  ctx.moveTo(36, 98);
+  ctx.lineTo(width - 36, 98);
   ctx.stroke();
 
   // 3. Render Columns for Each IPO
-  const cardWidth = (width - 80 - (count - 1) * 20) / count;
-  const startY = 135;
+  const startY = 114;
+  const cardH = 688;
 
   decision.rankings.forEach((ranked, idx) => {
     const ipo = ranked.ipo;
-    const cardX = 40 + idx * (cardWidth + 20);
-    const cardH = 560;
+    const cardX = isSingle ? 40 : 36 + idx * (cardWidth + 20);
+    const isWinner = (ranked.rank === 1 && ranked.isApplyable) || isSingle;
 
-    const isWinner = ranked.rank === 1 && ranked.isApplyable;
-
-    // Card background
+    // Card background & border
     ctx.fillStyle = isWinner ? 'rgba(15, 23, 42, 0.95)' : 'rgba(15, 23, 42, 0.75)';
     ctx.strokeStyle = isWinner ? '#10B981' : ranked.isApplyable ? '#334155' : '#475569';
     ctx.lineWidth = isWinner ? 2 : 1;
@@ -231,59 +344,174 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
 
     // Top Badge (Rank & Recommendation)
     ctx.fillStyle = ranked.color;
-    ctx.font = 'bold 12px sans-serif';
-    ctx.fillText(`${ranked.badge}`, cardX + 16, startY + 28);
+    ctx.font = 'bold 11.5px sans-serif';
+    ctx.fillText(`${ranked.badge}`, cardX + 16, startY + 24);
 
     // IPO Name
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 16px sans-serif';
-    const truncatedName = ipo.name.length > 24 ? ipo.name.slice(0, 22) + '...' : ipo.name;
-    ctx.fillText(truncatedName, cardX + 16, startY + 54);
+    ctx.font = 'bold 17px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    const truncatedName = ipo.name.length > 28 ? ipo.name.slice(0, 26) + '...' : ipo.name;
+    ctx.fillText(truncatedName, cardX + 16, startY + 48);
 
-    // Sector & Lifecycle Status
+    // Sector, Type & Status
     ctx.fillStyle = '#94A3B8';
     ctx.font = '11px sans-serif';
-    ctx.fillText(`${ipo.sector || 'Mainboard'} • ${ipo.status}`, cardX + 16, startY + 74);
+    const typeStr = ipo.ipoType === 'Sme' ? 'SME' : 'Mainboard';
+    ctx.fillText(`${ipo.sector || 'Diversified'} • ${typeStr} • ${ipo.status}`, cardX + 16, startY + 68);
 
-    // Scores Row
-    const scoreBoxY = startY + 90;
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.6)';
-    roundRect(ctx, cardX + 14, scoreBoxY, cardWidth - 28, 64, 8);
+    // DUAL SCORE GAUGES BOX (Visual Chart/Graph with /100 and Rating Pills)
+    const scoreBoxY = startY + 82;
+    const scoreBoxH = 132;
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.65)';
+    ctx.strokeStyle = 'rgba(51, 65, 85, 0.5)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, cardX + 12, scoreBoxY, cardWidth - 24, scoreBoxH, 10);
     ctx.fill();
+    ctx.stroke();
 
-    // Listing Gain Score
+    const listScore = (ipo as any).scores?.listingGainScore ?? ipo.listingGainScore ?? 50;
+    const ltScore = (ipo as any).scores?.longTermScore ?? ipo.longTermScore ?? 50;
+    const listRec = (ipo as any).scores?.listingRecommendation ?? (ipo as any).listingRecommendation ?? inferRating(listScore);
+    const ltRec = (ipo as any).scores?.longTermRecommendation ?? (ipo as any).longTermRecommendation ?? inferRating(ltScore);
+
+    const gaugeRadius = 28;
+    const gaugeCenterY = scoreBoxY + 44;
+    const leftCenterX = cardX + cardWidth * 0.28;
+    const rightCenterX = cardX + cardWidth * 0.72;
+
+    // Divider between gauges
+    ctx.strokeStyle = 'rgba(51, 65, 85, 0.4)';
+    ctx.beginPath();
+    ctx.moveTo(cardX + cardWidth / 2, scoreBoxY + 12);
+    ctx.lineTo(cardX + cardWidth / 2, scoreBoxY + scoreBoxH - 12);
+    ctx.stroke();
+
+    // Draw Left Radial Gauge: Listing Gain Score
+    drawScoreGauge(
+      ctx,
+      leftCenterX,
+      gaugeCenterY,
+      gaugeRadius,
+      listScore,
+      'LISTING GAIN',
+      listRec
+    );
+
+    // Draw Right Radial Gauge: Long-Term Score
+    drawScoreGauge(
+      ctx,
+      rightCenterX,
+      gaugeCenterY,
+      gaugeRadius,
+      ltScore,
+      'LONG-TERM',
+      ltRec
+    );
+
+    // EST. PROFIT / LOSS (PER LOT) HIGHLIGHT CARD
+    const gmpVal = ipo.latestGmp ?? (ipo as any).gmp?.currentGmp ?? 0;
+    const gmpPct = ipo.latestGmpPercentage ?? (ipo as any).gmp?.currentGmpPercentage ?? 0;
+    const priceHigh = ipo.priceBandHigh || 0;
+    const lotSize = ipo.lotSize || (priceHigh > 0 ? (ipo.ipoType === 'Sme' ? Math.floor(120000 / priceHigh) : Math.max(15, Math.floor(15000 / priceHigh))) : 0);
+    const minInv = ipo.minimumInvestment || (priceHigh > 0 && lotSize > 0 ? priceHigh * lotSize : 0);
+    const isListed = ipo.status === 'Listed';
+    const listPrice = ipo.actualListingPrice ?? ipo.listingPrice ?? 0;
+    const listGainPerLot = ipo.actualListingGainPerLot ?? (priceHigh > 0 && listPrice > 0 && lotSize > 0 ? (listPrice - priceHigh) * lotSize : (gmpVal * lotSize));
+    const estProfitPerLot = isListed ? listGainPerLot : (ipo.estimatedProfitPerLot ?? (gmpVal > 0 && lotSize > 0 ? gmpVal * lotSize : 0));
+
+    const profitBoxY = scoreBoxY + scoreBoxH + 10;
+    const profitBoxH = 46;
+
+    const profitBg = estProfitPerLot > 0 
+      ? 'rgba(16, 185, 129, 0.12)' 
+      : estProfitPerLot < 0 
+      ? 'rgba(239, 68, 68, 0.12)' 
+      : 'rgba(30, 41, 59, 0.5)';
+    const profitBorder = estProfitPerLot > 0 
+      ? 'rgba(16, 185, 129, 0.35)' 
+      : estProfitPerLot < 0 
+      ? 'rgba(239, 68, 68, 0.35)' 
+      : 'rgba(51, 65, 85, 0.5)';
+
+    ctx.fillStyle = profitBg;
+    ctx.strokeStyle = profitBorder;
+    ctx.lineWidth = 1;
+    roundRect(ctx, cardX + 12, profitBoxY, cardWidth - 24, profitBoxH, 8);
+    ctx.fill();
+    ctx.stroke();
+
     ctx.fillStyle = '#94A3B8';
-    ctx.font = '10px sans-serif';
-    ctx.fillText('LISTING GAIN', cardX + 26, scoreBoxY + 22);
-    ctx.fillStyle = '#10B981';
-    ctx.font = 'bold 20px sans-serif';
-    ctx.fillText(`${ipo.listingGainScore || '-'}`, cardX + 26, scoreBoxY + 48);
+    ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText(isListed ? 'DEBUT PROFIT (PER LOT)' : 'EST. PROFIT / LOSS (PER LOT)', cardX + 22, profitBoxY + 18);
 
-    // Long Term Score
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = '10px sans-serif';
-    ctx.fillText('LONG-TERM', cardX + cardWidth / 2 + 10, scoreBoxY + 22);
-    ctx.fillStyle = '#60A5FA';
-    ctx.font = 'bold 20px sans-serif';
-    ctx.fillText(`${ipo.longTermScore || '-'}`, cardX + cardWidth / 2 + 10, scoreBoxY + 48);
+    ctx.fillStyle = '#64748B';
+    ctx.font = '9px sans-serif';
+    const calcSubtext = lotSize > 0 && gmpVal > 0 
+      ? `(₹${gmpVal} GMP × ${lotSize} shs)` 
+      : lotSize > 0 ? `(${lotSize} shs / lot)` : '';
+    ctx.fillText(calcSubtext, cardX + 22, profitBoxY + 34);
 
-    // Metrics Table
-    const metricsStartY = scoreBoxY + 80;
+    const profitText = estProfitPerLot > 0 
+      ? `+₹${estProfitPerLot.toLocaleString('en-IN')}` 
+      : estProfitPerLot < 0 
+      ? `-₹${Math.abs(estProfitPerLot).toLocaleString('en-IN')}` 
+      : `₹0`;
+    ctx.fillStyle = estProfitPerLot > 0 ? '#10B981' : estProfitPerLot < 0 ? '#EF4444' : '#E2E8F0';
+    ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    const profitWidth = ctx.measureText(profitText).width;
+    ctx.fillText(profitText, cardX + cardWidth - 22 - profitWidth, profitBoxY + 28);
+
+    // METRICS TABLE
+    const metricsStartY = profitBoxY + profitBoxH + 18;
     const isClosedOrListed = ipo.status === 'Closed' || ipo.status === 'AllotmentOut' || ipo.status === 'Listed';
 
     const metrics = [
-      { label: 'Live GMP', val: `+₹${ipo.latestGmp || 0} (+${(ipo.latestGmpPercentage || 0).toFixed(1)}%)`, valColor: '#10B981' },
-      { label: 'Est. Listing Price', val: `₹${ipo.estimatedListingPrice || ipo.priceBandHigh || '-'}`, valColor: '#FFFFFF' },
-      { label: 'Price Band', val: `₹${ipo.priceBandLow || 0} - ₹${ipo.priceBandHigh || 0}`, valColor: '#E2E8F0' },
-      { label: 'Lot Size / Min Inv', val: `${ipo.lotSize || '-'} shs (₹${(ipo.minimumInvestment || 0).toLocaleString('en-IN')})`, valColor: '#E2E8F0' },
-      { label: 'Issue Size', val: `₹${ipo.issueSize ? ipo.issueSize.toLocaleString('en-IN') + ' Cr' : 'TBD'}`, valColor: '#E2E8F0' },
-      { label: 'Subscription', val: ipo.status === 'Upcoming' ? 'Bidding Soon' : `${ipo.totalSubscription || '-'}x`, valColor: '#34D399' },
-      { label: 'Bidding Dates', val: `${formatShortDate(ipo.openDate)} – ${formatShortDate(ipo.closeDate)}`, valColor: '#CBD5E1' },
-      { label: isClosedOrListed ? 'Listing / Listed On' : 'Expected Listing', val: formatShortDate(ipo.listingDate || ipo.closeDate), valColor: '#CBD5E1' }
+      { 
+        label: isListed ? 'Listing Gain' : 'Live GMP', 
+        val: isListed 
+          ? `+${(ipo.actualListingGainPercent ?? ipo.listingGainPercent ?? gmpPct).toFixed(1)}%` 
+          : `+₹${gmpVal} (+${gmpPct.toFixed(1)}%)`, 
+        valColor: '#10B981' 
+      },
+      { 
+        label: isListed ? 'Debut Listing Price' : 'Est. Listing Price', 
+        val: `₹${isListed && listPrice > 0 ? listPrice : (ipo.estimatedListingPrice || (priceHigh > 0 && gmpVal > 0 ? priceHigh + gmpVal : (priceHigh || '-')))}`, 
+        valColor: '#FFFFFF' 
+      },
+      { 
+        label: 'Price Band', 
+        val: `₹${ipo.priceBandLow || priceHigh || 0} – ₹${priceHigh || 0}`, 
+        valColor: '#E2E8F0' 
+      },
+      { 
+        label: 'Lot Size / Min Inv', 
+        val: `${lotSize || '-'} shs (₹${minInv.toLocaleString('en-IN')})`, 
+        valColor: '#E2E8F0' 
+      },
+      { 
+        label: 'Issue Size', 
+        val: `₹${ipo.issueSize ? ipo.issueSize.toLocaleString('en-IN') + ' Cr' : 'TBD'}`, 
+        valColor: '#E2E8F0' 
+      },
+      { 
+        label: 'Subscription', 
+        val: ipo.status === 'Upcoming' ? 'Bidding Soon' : `${ipo.totalSubscription || '-'}x`, 
+        valColor: '#34D399' 
+      },
+      { 
+        label: 'Bidding Dates', 
+        val: `${formatShortDate(ipo.openDate)} – ${formatShortDate(ipo.closeDate)}`, 
+        valColor: '#CBD5E1' 
+      },
+      { 
+        label: isClosedOrListed ? 'Listing / Listed On' : 'Expected Listing', 
+        val: formatShortDate(ipo.listingDate || ipo.closeDate), 
+        valColor: '#CBD5E1' 
+      }
     ];
 
     metrics.forEach((m, mIdx) => {
-      const rowY = metricsStartY + mIdx * 30;
+      const rowY = metricsStartY + mIdx * 28;
       ctx.fillStyle = '#94A3B8';
       ctx.font = '11px sans-serif';
       ctx.fillText(m.label, cardX + 16, rowY);
@@ -294,7 +522,7 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
       ctx.fillText(m.val, cardX + cardWidth - 16 - textWidth, rowY);
 
       if (mIdx < metrics.length - 1) {
-        ctx.strokeStyle = 'rgba(51, 65, 85, 0.4)';
+        ctx.strokeStyle = 'rgba(51, 65, 85, 0.35)';
         ctx.beginPath();
         ctx.moveTo(cardX + 16, rowY + 6);
         ctx.lineTo(cardX + cardWidth - 16, rowY + 6);
@@ -303,9 +531,9 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
     });
 
     // Verdict Footer Box inside Card
-    const verdictY = startY + cardH - 68;
+    const verdictY = startY + cardH - 62;
     ctx.fillStyle = isWinner ? 'rgba(16, 185, 129, 0.15)' : 'rgba(30, 41, 59, 0.6)';
-    roundRect(ctx, cardX + 12, verdictY, cardWidth - 24, 56, 6);
+    roundRect(ctx, cardX + 12, verdictY, cardWidth - 24, 50, 6);
     ctx.fill();
 
     ctx.fillStyle = isWinner ? '#34D399' : '#E2E8F0';
@@ -314,16 +542,16 @@ export async function generateComparisonImage(ipos: IpoSummary[]): Promise<strin
   });
 
   // 4. Footer Branding & Author Contact
-  const footerY = height - 25;
+  const footerY = height - 20;
   ctx.fillStyle = '#64748B';
-  ctx.font = '10.5px sans-serif';
-  ctx.fillText('IPOForge • Research. Analyze. Decide. • https://github.com/shatru123/IPOForge', 40, footerY);
+  ctx.font = '10px sans-serif';
+  ctx.fillText('IPOForge • Research. Analyze. Decide. • https://github.com/shatru123/IPOForge', 36, footerY);
 
   ctx.fillStyle = '#94A3B8';
-  ctx.font = 'bold 10.5px sans-serif';
+  ctx.font = 'bold 10px sans-serif';
   const authorText = 'Created by Shatrughna Ambhore (ambhoreshatrughna@gmail.com | +91 9604466334)';
   const authorWidth = ctx.measureText(authorText).width;
-  ctx.fillText(authorText, width - 40 - authorWidth, footerY);
+  ctx.fillText(authorText, width - 36 - authorWidth, footerY);
 
   return canvas.toDataURL('image/png');
 }
