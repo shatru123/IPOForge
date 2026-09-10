@@ -411,7 +411,17 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
                     UpdatedAt = now
                 };
 
-                ipo.GmpHistories.Add(new IPOGmpHistory { IpoId = ipo.Id, GMP = 0, Source = "Live Pipeline Tracker", ObservedAt = now });
+                ipo.GmpHistories.Add(new IPOGmpHistory
+                {
+                    Id = Guid.NewGuid(),
+                    IpoId = ipo.Id,
+                    GMP = 0,
+                    GMPPercentage = 0,
+                    EstimatedListingPrice = priceHigh > 0 ? priceHigh : 100,
+                    Source = "Live Pipeline Tracker",
+                    ObservedAt = now,
+                    RetrievedAt = now
+                });
                 CalculateDynamicScores(ipo, 0, false, issueSize, cleanName, IpoStatus.Upcoming, now);
 
                 list.Add(ipo);
@@ -481,6 +491,7 @@ public class PublicScraperDataProvider : IGmpDataProvider, ISubscriptionDataProv
                 var (sector, industry) = InferSector(cleanName);
                 var company = new Company
                 {
+                    Id = Guid.NewGuid(),
                     Name = cleanName,
                     LegalName = $"{cleanName} Limited",
                     CIN = $"L{Math.Abs(cleanName.GetHashCode()) % 90000 + 10000}MH2015PLC{Math.Abs(cleanName.GetHashCode()) % 900000 + 100000}",

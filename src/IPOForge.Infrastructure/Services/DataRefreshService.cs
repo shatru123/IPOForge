@@ -120,9 +120,57 @@ public class DataRefreshService : IDataRefreshService
                         {
                             foreach (var fin in liveIpo.Company.Financials)
                             {
-                                fin.CompanyId = match.Company.Id;
-                                match.Company.Financials.Add(fin);
+                                var finEntity = new CompanyFinancial
+                                {
+                                    Id = Guid.NewGuid(),
+                                    CompanyId = match.Company.Id,
+                                    FiscalYear = fin.FiscalYear,
+                                    PeriodEnding = fin.PeriodEnding,
+                                    Revenue = fin.Revenue,
+                                    EBITDA = fin.EBITDA,
+                                    EBIT = fin.EBIT,
+                                    PAT = fin.PAT,
+                                    EPS = fin.EPS,
+                                    TotalAssets = fin.TotalAssets,
+                                    TotalDebt = fin.TotalDebt,
+                                    NetWorth = fin.NetWorth,
+                                    CurrentAssets = fin.CurrentAssets,
+                                    CurrentLiabilities = fin.CurrentLiabilities,
+                                    OperatingCashFlow = fin.OperatingCashFlow,
+                                    FreeCashFlow = fin.FreeCashFlow,
+                                    EbitdaMargin = fin.EbitdaMargin,
+                                    PatMargin = fin.PatMargin,
+                                    ROE = fin.ROE,
+                                    DebtToEquity = fin.DebtToEquity,
+                                    CurrentRatio = fin.CurrentRatio,
+                                    CreatedAt = DateTime.UtcNow,
+                                    UpdatedAt = DateTime.UtcNow
+                                };
+                                match.Company.Financials.Add(finEntity);
+                                _context.Entry(finEntity).State = Microsoft.EntityFrameworkCore.EntityState.Added;
                             }
+                        }
+                    }
+
+                    if (!match.SubscriptionHistories.Any() && liveIpo.SubscriptionHistories.Any())
+                    {
+                        foreach (var sub in liveIpo.SubscriptionHistories)
+                        {
+                            var subEntity = new IPOSubscriptionHistory
+                            {
+                                Id = Guid.NewGuid(),
+                                IpoId = match.Id,
+                                DayNumber = sub.DayNumber,
+                                QibSubscription = sub.QibSubscription,
+                                NiiSubscription = sub.NiiSubscription,
+                                RetailSubscription = sub.RetailSubscription,
+                                EmployeeSubscription = sub.EmployeeSubscription,
+                                TotalSubscription = sub.TotalSubscription,
+                                SnapshotDate = sub.SnapshotDate,
+                                Source = sub.Source
+                            };
+                            match.SubscriptionHistories.Add(subEntity);
+                            _context.Entry(subEntity).State = Microsoft.EntityFrameworkCore.EntityState.Added;
                         }
                     }
 
@@ -143,6 +191,7 @@ public class DataRefreshService : IDataRefreshService
                             RetrievedAt = DateTime.UtcNow
                         };
                         match.GmpHistories.Add(gmpHistory);
+                        _context.Entry(gmpHistory).State = Microsoft.EntityFrameworkCore.EntityState.Added;
                     }
                 }
             }
@@ -151,12 +200,12 @@ public class DataRefreshService : IDataRefreshService
             foreach (var ipo in existingIpos)
             {
                 recordsProcessed++;
-                var ind = industryMetrics.FirstOrDefault(m => m.Sector == ipo.Company.Sector);
-                var finReport = _financialEngine.AnalyzeFinancials(ipo.Company);
-                var latestFin = ipo.Company.Financials.OrderBy(f => f.PeriodEnding).LastOrDefault();
+                var ind = industryMetrics.FirstOrDefault(m => m.Sector == ipo.Company?.Sector);
+                var finReport = ipo.Company != null ? _financialEngine.AnalyzeFinancials(ipo.Company) : null;
+                var latestFin = ipo.Company?.Financials?.OrderBy(f => f.PeriodEnding).LastOrDefault();
                 var valDto = _valuationEngine.EvaluateValuation(ipo, latestFin, ind);
                 var gmpDto = _gmpAnalyticsService.AnalyzeGmpHistory(ipo);
-                var subHistory = ipo.SubscriptionHistories.OrderBy(s => s.DayNumber).ToList();
+                var subHistory = ipo.SubscriptionHistories?.OrderBy(s => s.DayNumber).ToList() ?? new();
                 var latestSub = subHistory.LastOrDefault();
 
                 var subBreakdown = new Contracts.Subscription.SubscriptionBreakdownDto
@@ -169,9 +218,9 @@ public class DataRefreshService : IDataRefreshService
                     LatestRetailSubscription = latestSub?.RetailSubscription ?? 0
                 };
 
-                var scoreBreakdown = _scoringEngine.CalculateScore(ipo, finReport, valDto, gmpDto, subBreakdown, ipo.Risks.ToList());
+                var scoreBreakdown = _scoringEngine.CalculateScore(ipo, finReport, valDto, gmpDto, subBreakdown, ipo.Risks?.ToList() ?? new());
 
-                var existingScore = ipo.Scores.OrderByDescending(s => s.CalculatedAt).FirstOrDefault();
+                var existingScore = ipo.Scores?.OrderByDescending(s => s.CalculatedAt).FirstOrDefault();
                 if (existingScore != null)
                 {
                     existingScore.ListingGainScore = scoreBreakdown.ListingGainScore;
@@ -198,7 +247,9 @@ public class DataRefreshService : IDataRefreshService
                         BreakdownJson = JsonSerializer.Serialize(scoreBreakdown),
                         CalculatedAt = DateTime.UtcNow
                     };
+                    ipo.Scores ??= new List<IPOScore>();
                     ipo.Scores.Add(newScore);
+                    _context.Entry(newScore).State = Microsoft.EntityFrameworkCore.EntityState.Added;
                 }
             }
 
@@ -224,10 +275,16 @@ public class DataRefreshService : IDataRefreshService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during live data refresh.");
+            var err = ex.Message;
+            if (ex is Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException concEx)
+            {
+                var entries = string.Join("; ", concEx.Entries.Select(e => $"{e.Entity.GetType().Name} (Id: {e.Property("Id").CurrentValue}, State: {e.State}, ModProps: [{string.Join(", ", e.Properties.Where(p => p.IsModified).Select(p => $"{p.Metadata.Name}: {p.OriginalValue}->{p.CurrentValue}"))}])"));
+                err = $"Concurrency Exception on entities: {entries}. Details: {ex.Message}";
+            }
+            _logger.LogError(ex, "Error during live data refresh: {ErrMsg}", err);
             log.Status = "Failed";
             log.CompletedAt = DateTime.UtcNow;
-            log.ErrorMessage = ex.Message;
+            log.ErrorMessage = err;
             try
             {
                 await _context.DataRefreshLogs.AddAsync(log, cancellationToken);
@@ -241,8 +298,8 @@ public class DataRefreshService : IDataRefreshService
                 Status = "Failed",
                 StartedAt = log.StartedAt,
                 CompletedAt = log.CompletedAt,
-                ErrorMessage = ex.Message,
-                Details = "Live data sync encountered an error."
+                ErrorMessage = err,
+                Details = ex.ToString()
             };
         }
     }
