@@ -106,6 +106,9 @@ public static class DependencyInjection
         services.AddScoped<ISubscriptionDataProvider, PublicScraperDataProvider>();
         services.AddScoped<IIpoDataProvider, PublicScraperDataProvider>();
 
+        // Automated Background Worker for Scheduled Market Ingestion
+        services.AddHostedService<MarketDataBackgroundWorker>();
+
         return services;
     }
 }

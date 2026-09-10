@@ -96,23 +96,6 @@ using (var scope = app.Services.CreateScope())
             gmp,
             risk,
             logger);
-
-        // Immediately trigger live public market data scan
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                using var scanScope = app.Services.CreateScope();
-                var refreshService = scanScope.ServiceProvider.GetRequiredService<IDataRefreshService>();
-                logger.LogInformation("Scanning real-time public Indian IPO feeds...");
-                await refreshService.RefreshMarketDataAsync(new DataRefreshRequest { ForceFullSync = true });
-                logger.LogInformation("Real-time live IPO scan complete.");
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Live market data scan completed initial pass.");
-            }
-        });
     }
     catch (Exception ex)
     {

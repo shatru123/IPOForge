@@ -10,6 +10,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("ConnectionStrings:DefaultConnection", $"InMemory:{_dbName}");
+        builder.UseSetting("BackgroundWorker:Enabled", "false");
         builder.UseEnvironment("Testing");
     }
 }
